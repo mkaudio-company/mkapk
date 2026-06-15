@@ -761,7 +761,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(examples): add parameter-bound gain plugin` | Files: `crates/gui-vst3/examples/gain.rs`
 
-- [ ] 19. macOS windowing and NSView management
+- [x] 19. macOS windowing and NSView management
 
   **What to do**: In `gui-mac`, implement `MacWindow` that creates an `NSView` (or wraps an existing one from `ParentWindowHandle::Mac`) and handles `drawRect:`, `viewDidChangeBackingProperties`, `mouseDown:`, `mouseUp:`, `mouseDragged:`, `keyDown:`, `keyUp:`, `setFrameSize:`, and `viewWillMoveToWindow:`. Use `CALayer` backing where appropriate. Report backing scale factor changes for HiDPI.
 
@@ -860,7 +860,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(mac): add CoreText text rendering` | Files: `crates/gui-mac/src/text.rs`
 
-- [ ] 22. AU plugin wrapper
+- [x] 22. AU plugin wrapper
 
   **What to do**: In `gui-au`, create an `AUView`/`AUEditorBase` wrapper around `gui-host::PluginEditor`. Implement `GetProperty`/`SetProperty` for `kAudioUnitProperty_CocoaUI`, lifecycle `CreateUI`, `Cleanup`, `Open`, `Close`, and resize callbacks. Use the CoreAudio SDK headers. Gate the crate on an `au` feature.
 

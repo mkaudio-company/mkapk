@@ -76,4 +76,30 @@
 - Added `win32_window_exports` compile-only test.
 - Verification: `cargo test -p gui-win32` passes (1 test). `cargo build --workspace` cannot currently be verified on macOS because `gui-vst3` depends on `vst3-sys`, which is not published on crates.io; building the remaining workspace (with `gui-vst3` temporarily excluded) passes.
 
+## Task 22: gui-au AUv2 Cocoa UI wrapper
+
+- Implemented `AuEditor` in `crates/gui-au/src/editor.rs` wrapping a `Box<dyn PluginEditor>`.
+- Created a dynamic `NSView` subclass (`GuiAuView`) using `objc::declare::ClassDecl`.
+- Overrode `initWithFrame:` to open the editor via `ParentWindowHandle::Mac`, `setFrameSize:` to call `editor.resize`, and `dealloc` to call `editor.close` and drop the editor/host state.
+- Stored the editor/host state in an ivar (`_auState`) on the view.
+- Used a thread-local pending state to pass the editor into `initWithFrame:` (v0.1 simplification).
+- Defined `AudioComponentDescription` and `AuCocoaViewInfo` for the `kAudioUnitProperty_CocoaUI` response; `get_cocoa_view_info()` returns the registered view class.
+- Gated the crate on an `au` feature (enabled by default) and macOS-specific Objective-C dependencies under `cfg(target_os = "macos")`.
+- Added a non-macOS stub so the API exists on other platforms but returns null/zero-filled values.
+- Added compile-only `au_editor_exports` test.
+- Verification: `cargo build -p gui-au` exits 0, `cargo test -p gui-au` passes (1 test), and `cargo build -p gui-au --no-default-features` exits 0.
+
+## Task 19: gui-mac macOS windowing and NSView management
+
+- Implemented `MacWindow` in `crates/gui-mac/src/window.rs` wrapping an `NSView`.
+- Updated `crates/gui-mac/src/lib.rs` to export `window::MacWindow` and added `#[macro_use] extern crate objc;` for macOS.
+- Added `objc` as a macOS-only dependency in `crates/gui-mac/Cargo.toml`.
+- `MacWindow::create` accepts `ParentWindowHandle::Mac`, casts the pointer to `id`, and creates a standalone `NSWindow`+`NSView` when the parent is null for test-host usage.
+- `EditorWindowState` stores the editor, host, and last known size; it is kept in a process-wide map keyed by view address for v0.1 (avoids `objc_setAssociatedObject` complexity).
+- `bounds()` polls the view bounds and calls `editor.resize(size)` when the size changes, satisfying the pragmatic v0.1 resize notification approach.
+- `request_repaint` calls `setNeedsDisplay:`, `backing_scale` reads `window.backingScaleFactor`, and `bounds` returns a `gui_core::Rectf`.
+- `Drop` calls `editor.close()` and releases any standalone window.
+- Added compile-only `mac_window_exports` test.
+- Verification: `cargo test -p gui-mac` passes (1 test) and `cargo build --workspace` passes on macOS.
+
 
