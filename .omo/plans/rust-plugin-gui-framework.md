@@ -794,7 +794,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(mac): add NSView windowing and HiDPI handling` | Files: `crates/gui-mac/src/window.rs`
 
-- [ ] 20. CoreGraphics render backend
+- [x] 20. CoreGraphics render backend
 
   **What to do**: In `gui-mac`, create a `CoreGraphicsRenderBackend` implementing `gui-core::RenderBackend`. Use `CGContext` from `drawRect:` or an offscreen `CGBitmapContext`. Implement commands: clear, fill rect, stroke rect, rounded rect, path fill/stroke, linear gradient, image draw. Integrate with the zero-allocation `CommandList` replay.
 

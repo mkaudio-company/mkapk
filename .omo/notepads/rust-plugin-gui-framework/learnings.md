@@ -98,17 +98,17 @@
 - Added compile-only `au_editor_exports` test.
 - Verification: `cargo build -p gui-au` exits 0, `cargo test -p gui-au` passes (1 test), and `cargo build -p gui-au --no-default-features` exits 0.
 
-## Task 19: gui-mac macOS windowing and NSView management
+## Task 20: gui-mac CoreGraphics render backend
 
-- Implemented `MacWindow` in `crates/gui-mac/src/window.rs` wrapping an `NSView`.
-- Updated `crates/gui-mac/src/lib.rs` to export `window::MacWindow` and added `#[macro_use] extern crate objc;` for macOS.
-- Added `objc` as a macOS-only dependency in `crates/gui-mac/Cargo.toml`.
-- `MacWindow::create` accepts `ParentWindowHandle::Mac`, casts the pointer to `id`, and creates a standalone `NSWindow`+`NSView` when the parent is null for test-host usage.
-- `EditorWindowState` stores the editor, host, and last known size; it is kept in a process-wide map keyed by view address for v0.1 (avoids `objc_setAssociatedObject` complexity).
-- `bounds()` polls the view bounds and calls `editor.resize(size)` when the size changes, satisfying the pragmatic v0.1 resize notification approach.
-- `request_repaint` calls `setNeedsDisplay:`, `backing_scale` reads `window.backingScaleFactor`, and `bounds` returns a `gui_core::Rectf`.
-- `Drop` calls `editor.close()` and releases any standalone window.
-- Added compile-only `mac_window_exports` test.
-- Verification: `cargo test -p gui-mac` passes (1 test) and `cargo build --workspace` passes on macOS.
+- Added `crates/gui-mac/src/render.rs` with `CoreGraphicsRenderBackend` implementing `gui_core::RenderBackend`.
+- `NSGraphicsContext.currentContext` exposes its CG context via the `CGContext` selector (not the legacy `graphicsPort`).
+- Use `core_graphics::context::CGContext::from_existing_context_ptr` to retain the borrowed CG context before storing it; release happens automatically on drop.
+- CoreGraphics uses a bottom-left origin, so the backend flips the Y axis in `begin()` to match the framework's top-left coordinate convention.
+- `core-graphics` 0.24 does not bind `CGPathCreateWithRoundedRect`; declare it manually with `#[link(name = "CoreGraphics", kind = "framework")]` and wrap the result in `core_graphics::path::CGPath`.
+- Linear gradients need a color space (`CGColorSpace::create_device_rgb()`) and component/location arrays; use `ctx.save()/restore()` around `clip_to_rect` so gradient clipping does not leak to later commands.
+- `DrawImage` and `DrawText` are left as no-ops for v0.1.
+- Added a non-macOS stub so `gui-mac` still compiles on other platforms.
+- Verification: `cargo build -p gui-mac`, `cargo test -p gui-mac`, `cargo run -p gui-test-host --example cg-rect -- --duration-ms 1000`, and `cargo clippy -p gui-mac -p gui-test-host -- -D warnings` all pass.
+
 
 
