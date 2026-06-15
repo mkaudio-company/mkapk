@@ -339,6 +339,8 @@ dependencies = [
  "core-foundation",
  "gui-core",
  "gui-host",
+ "gui-mac",
+ "gui-test-host",
  "objc",
 ]
 
