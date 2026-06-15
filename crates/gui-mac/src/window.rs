@@ -52,6 +52,10 @@ impl MacWindow {
         }
     }
 
+    pub fn view(&self) -> *mut core::ffi::c_void {
+        self.view
+    }
+
     pub fn bounds(&self) -> gui_core::Rectf {
         unsafe { bounds_mac(self) }
     }
@@ -73,6 +77,10 @@ impl MacWindow {
 
     pub fn backing_scale(&self) -> f32 {
         1.0
+    }
+
+    pub fn view(&self) -> *mut core::ffi::c_void {
+        core::ptr::null_mut()
     }
 
     pub fn bounds(&self) -> gui_core::Rectf {
