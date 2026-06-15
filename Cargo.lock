@@ -181,6 +181,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-text"
+version = "21.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a593227b66cbd4007b2a050dfdd9e1d1318311409c8d600dc82ba1b15ca9c130"
+dependencies = [
+ "core-foundation",
+ "core-graphics",
+ "foreign-types",
+ "libc",
+]
+
+[[package]]
 name = "criterion"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -349,7 +361,9 @@ name = "gui-mac"
 version = "0.1.0"
 dependencies = [
  "cocoa",
+ "core-foundation",
  "core-graphics",
+ "core-text",
  "foreign-types",
  "gui-core",
  "gui-host",
