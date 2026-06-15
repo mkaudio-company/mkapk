@@ -1,5 +1,7 @@
 #![deny(unsafe_code)]
 
-pub fn gui_host_ready() -> bool {
-    true
-}
+pub mod editor;
+pub mod parameter;
+
+pub use editor::{EditorHost, ParentWindowHandle, PluginEditor, SizeConstraints};
+pub use parameter::{NormalizedValue, ParameterGateway, ParameterId, ParameterInfo};
