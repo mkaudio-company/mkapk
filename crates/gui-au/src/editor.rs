@@ -228,9 +228,27 @@ pub fn get_cocoa_view_info() -> AuCocoaViewInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gui_core::Sizef;
+    use gui_host::{
+        EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor, SizeConstraints,
+    };
+
+    struct DummyEditor;
+
+    impl PluginEditor for DummyEditor {
+        fn open(&mut self, _parent: ParentWindowHandle, _host: &dyn EditorHost) {}
+        fn close(&mut self) {}
+        fn resize(&mut self, _size: Sizef) {}
+        fn idle(&mut self) {}
+        fn on_parameter_changed(&mut self, _id: ParameterId, _value: NormalizedValue) {}
+        fn size_constraints(&self) -> SizeConstraints {
+            SizeConstraints::default()
+        }
+    }
 
     #[test]
     fn au_editor_exports() {
         let _ = std::mem::size_of::<AuEditor>();
+        let _ = std::mem::size_of_val(&AuEditor::new(Box::new(DummyEditor)));
     }
 }
