@@ -165,8 +165,12 @@ dependencies = [
 name = "gui-test-host"
 version = "0.1.0"
 dependencies = [
+ "cocoa",
+ "core-graphics",
  "gui-core",
  "gui-host",
+ "objc",
+ "windows",
 ]
 
 [[package]]

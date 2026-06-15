@@ -295,7 +295,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(res): add ResourceId and static resource bundle skeleton` | Files: `crates/gui-res/src/**`, `crates/gui-res/tests/**`
 
-- [ ] 5. DAW-less test host skeleton
+- [x] 5. DAW-less test host skeleton
 
   **What to do**: Create `gui-test-host` as a tiny executable crate. On Windows it creates an `HWND` window; on macOS it creates an `NSWindow`/`NSView`. It accepts a plugin editor factory, attaches the editor to the native window, runs an idle loop for a configurable number of frames or seconds, and then detaches. Output events (`EditorAttached`, `EditorResized`, `EditorDetached`) to stdout. Keep platform-specific code isolated in `src/platform/win32.rs` and `src/platform/mac.rs`.
 

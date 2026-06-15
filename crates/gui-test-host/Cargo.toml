@@ -6,6 +6,22 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[lib]
+name = "gui_test_host"
+path = "src/lib.rs"
+
+[[bin]]
+name = "gui-test-host"
+path = "src/main.rs"
+
 [dependencies]
 gui-core = { workspace = true }
 gui-host = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62.2", default-features = false, features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_Graphics_Gdi"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.26.1"
+objc = "0.2.7"
+core-graphics = "0.24.0"

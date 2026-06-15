@@ -45,6 +45,18 @@
       "updated_at": "2026-06-15T15:42:52.342Z",
       "ended_at": "2026-06-15T15:42:52.342Z",
       "elapsed_ms": 258921
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "DAW-less test host skeleton",
+      "session_id": "opencode:ses_1340ae3f7ffezzmjUR6Mox4vpH",
+      "agent": "general",
+      "updated_at": "2026-06-15T17:06:30.914Z",
+      "started_at": "2026-06-15T17:04:30.827Z",
+      "status": "completed",
+      "ended_at": "2026-06-15T17:06:30.914Z",
+      "elapsed_ms": 120087
     }
   },
   "schema_version": 2,
@@ -54,7 +66,7 @@
       "active_plan": "/Users/minjaekim/Plugins/gui/.omo/plans/rust-plugin-gui-framework.md",
       "plan_name": "rust-plugin-gui-framework",
       "started_at": "2026-06-15T13:49:47Z",
-      "updated_at": "2026-06-15T15:42:52.342Z",
+      "updated_at": "2026-06-15T17:06:30.914Z",
       "session_ids": [
         "opencode:ses_135f513edffeFut1BWMhwIUVU2"
       ],
@@ -98,10 +110,22 @@
           "updated_at": "2026-06-15T15:42:52.342Z",
           "ended_at": "2026-06-15T15:42:52.342Z",
           "elapsed_ms": 258921
+        },
+        "todo:5": {
+          "task_key": "todo:5",
+          "task_label": "5",
+          "task_title": "DAW-less test host skeleton",
+          "session_id": "opencode:ses_1340ae3f7ffezzmjUR6Mox4vpH",
+          "agent": "general",
+          "updated_at": "2026-06-15T17:06:30.914Z",
+          "started_at": "2026-06-15T17:04:30.827Z",
+          "status": "completed",
+          "ended_at": "2026-06-15T17:06:30.914Z",
+          "elapsed_ms": 120087
         }
       }
     }
   },
   "active_work_id": "rust-plugin-gui-framework-legacy",
-  "updated_at": "2026-06-15T15:42:52.342Z"
+  "updated_at": "2026-06-15T17:06:30.914Z"
 }

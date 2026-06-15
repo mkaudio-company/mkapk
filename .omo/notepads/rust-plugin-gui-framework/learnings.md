@@ -38,3 +38,20 @@
 - Added a minimal 1x1 PNG at `crates/gui-res/resources/test.png` and a roundtrip test in `src/bundle.rs`.
 - Verification: `cargo test -p gui-res` passes, `cargo clippy -p gui-res -- -D warnings` passes.
 
+## Task 5: gui-test-host DAW-less test host
+
+- Refactored `gui-test-host` from a single binary into a library + binary crate, exposing `run_test_host(duration_ms, width, height)`.
+- Implemented `BlankEditor` (prints lifecycle markers) and `TestHost` (empty `EditorHost` impl) in `src/lib.rs`.
+- Added platform modules under `src/platform/`:
+  - `win32.rs`: registers a window class, creates an overlapped window, pumps via `PeekMessageW`, returns `ParentWindowHandle::Windows(hwnd)`.
+  - `mac.rs`: creates an `NSApplication`, `NSWindow`, and `NSView`, pumps via `nextEventMatchingMask:untilDate:inMode:dequeue:`, returns `ParentWindowHandle::Mac(view)`.
+- `src/main.rs` parses `--duration-ms`, `--width`, `--height` and delegates to `run_test_host`.
+- Added `examples/blank.rs` as a thin wrapper that runs the test host with default parameters.
+- Added unit tests for `BlankEditor` lifecycle and default size constraints.
+- Notes:
+  - The `cocoa` crate's `base::class` helper is gone in 0.26.1; use `objc::runtime::Class::get` directly.
+  - `objc` macros need `#[macro_use] extern crate objc;` at the crate root (gated to macOS).
+  - `NSEventMask::NSAnyEventMask.bits()` is a method, not a field, in this `bitflags` version.
+- Verification: `cargo build --workspace` passes, `cargo test -p gui-test-host` passes (2 tests), and `cargo run -p gui-test-host --example blank -- --duration-ms 500` opens a window and prints `EditorAttached`/`EditorDetached` markers.
+
+
