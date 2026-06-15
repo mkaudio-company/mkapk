@@ -145,16 +145,8 @@ impl CoreGraphicsRenderBackend {
                 }
                 draw_linear_gradient(ctx, rect, start, end, stops);
             }
-            PaintCommand::DrawImage { rect, image } => {
-                eprintln!(
-                    "CoreGraphicsRenderBackend::DrawImage not implemented (rect={rect:?}, image={image:?})"
-                );
-            }
-            PaintCommand::DrawText { position, text } => {
-                eprintln!(
-                    "CoreGraphicsRenderBackend::DrawText not implemented (position={position:?}, text={text:?})"
-                );
-            }
+            PaintCommand::DrawImage { .. } => {}
+            PaintCommand::DrawText { .. } => {}
         }
     }
 }
@@ -271,39 +263,70 @@ pub fn render_to_view(
     scale: f32,
     commands: &CommandList,
 ) -> Option<()> {
+    let (view, cg_context) = lock_view_context(view)?;
+    let mut backend = CoreGraphicsRenderBackend::new(cg_context, Rectf::default(), scale);
+    backend.begin(size);
+    backend.replay(commands);
+    backend.end();
+    unlock_view(view);
+    Some(())
+}
+
+#[cfg(target_os = "macos")]
+pub fn render_text_to_view(
+    view: *mut core::ffi::c_void,
+    _size: Sizef,
+    _scale: f32,
+    layout: &crate::TextLayout,
+    position: Pointf,
+) -> Option<()> {
+    let (view, cg_context) = lock_view_context(view)?;
+    layout.draw(&cg_context, position);
+    unlock_view(view);
+    Some(())
+}
+
+#[cfg(target_os = "macos")]
+fn lock_view_context(
+    view: *mut core::ffi::c_void,
+) -> Option<(*mut objc::runtime::Object, CGContext)> {
+    use objc::runtime::{BOOL, Object, YES};
+
     if view.is_null() {
         return None;
     }
 
-    use objc::runtime::{BOOL, Class, Object, YES};
-
-    unsafe {
-        let view = view as *mut Object;
-        let locked: BOOL = msg_send![view, lockFocusIfCanDraw];
-        if locked != YES {
-            return None;
-        }
-
-        let context_class = Class::get("NSGraphicsContext")?;
-        let ns_context: *mut Object = msg_send![context_class, currentContext];
-        if ns_context.is_null() {
-            return None;
-        }
-
-        let cg_ptr: *mut core_graphics::sys::CGContext = msg_send![ns_context, CGContext];
-        if cg_ptr.is_null() {
-            return None;
-        }
-
-        let cg_context = CGContext::from_existing_context_ptr(cg_ptr);
-        let mut backend = CoreGraphicsRenderBackend::new(cg_context, Rectf::default(), scale);
-        backend.begin(size);
-        backend.replay(commands);
-        backend.end();
-
-        let _: () = msg_send![view, unlockFocus];
-        Some(())
+    let view = view as *mut Object;
+    let locked: BOOL = unsafe { msg_send![view, lockFocusIfCanDraw] };
+    if locked != YES {
+        return None;
     }
+
+    let context_class = objc::runtime::Class::get("NSGraphicsContext")?;
+    let ns_context: *mut Object = unsafe { msg_send![context_class, currentContext] };
+    if ns_context.is_null() {
+        unsafe {
+            let _: () = msg_send![view, unlockFocus];
+        }
+        return None;
+    }
+
+    let cg_ptr: *mut core_graphics::sys::CGContext = unsafe { msg_send![ns_context, CGContext] };
+    if cg_ptr.is_null() {
+        unsafe {
+            let _: () = msg_send![view, unlockFocus];
+        }
+        return None;
+    }
+
+    Some((view, unsafe {
+        CGContext::from_existing_context_ptr(cg_ptr)
+    }))
+}
+
+#[cfg(target_os = "macos")]
+fn unlock_view(view: *mut objc::runtime::Object) {
+    let _: () = unsafe { msg_send![view, unlockFocus] };
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -327,6 +350,17 @@ pub fn render_to_view(
     _size: Sizef,
     _scale: f32,
     _commands: &CommandList,
+) -> Option<()> {
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn render_text_to_view(
+    _view: *mut core::ffi::c_void,
+    _size: Sizef,
+    _scale: f32,
+    _layout: &crate::TextLayout,
+    _position: Pointf,
 ) -> Option<()> {
     None
 }
