@@ -18,3 +18,7 @@ gui-host = { workspace = true }
 cocoa = "0.26.1"
 objc = "0.2.7"
 core-foundation = "0.10.0"
+
+[dev-dependencies]
+gui-mac = { workspace = true }
+gui-test-host = { workspace = true }

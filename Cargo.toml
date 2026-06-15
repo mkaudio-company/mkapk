@@ -27,3 +27,4 @@ gui-host = { path = "crates/gui-host" }
 gui-res = { path = "crates/gui-res" }
 gui-accessibility = { path = "crates/gui-accessibility" }
 gui-mac = { path = "crates/gui-mac" }
+gui-test-host = { path = "crates/gui-test-host" }
