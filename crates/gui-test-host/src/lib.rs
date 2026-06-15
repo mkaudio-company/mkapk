@@ -1,4 +1,4 @@
-#![allow(unexpected_cfgs)]
+#![allow(unexpected_cfgs, deprecated)]
 
 #[cfg(target_os = "macos")]
 #[macro_use]
@@ -49,9 +49,13 @@ impl EditorHost for TestHost {
     fn set_parameter_normalized(&self, _id: ParameterId, _value: NormalizedValue) {}
 }
 
-pub fn run_test_host(duration_ms: u64, width: u32, height: u32) {
+pub fn run_test_host_with_editor<E: PluginEditor + 'static>(
+    duration_ms: u64,
+    width: u32,
+    height: u32,
+    mut editor: E,
+) {
     let (window, parent_handle) = create_host_window(width, height);
-    let mut editor = BlankEditor;
     let host = TestHost;
 
     println!("EditorAttached");
@@ -70,6 +74,10 @@ pub fn run_test_host(duration_ms: u64, width: u32, height: u32) {
     editor.close();
     println!("EditorDetached");
     window.destroy();
+}
+
+pub fn run_test_host(duration_ms: u64, width: u32, height: u32) {
+    run_test_host_with_editor(duration_ms, width, height, BlankEditor);
 }
 
 #[cfg(test)]
