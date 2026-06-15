@@ -190,7 +190,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `chore(workspace): create multi-crate workspace skeleton` | Files: `Cargo.toml`, `crates/**`, `xtask/**`
 
-- [ ] 2. Core geometry, math, and color primitives
+- [x] 2. Core geometry, math, and color primitives
 
   **What to do**: Implement foundational types in `gui-core`: `Point`, `Size`, `Rect`, `Insets`, `Transform`, `Color` (sRGBA), `Px` (physical pixel) vs `Dp` (device-independent point) types, scalar math helpers. Keep the API `#![no_std]`-friendly where possible (use `core` only). Add unit tests for all operations.
 
