@@ -57,6 +57,18 @@
       "status": "completed",
       "ended_at": "2026-06-15T17:06:30.914Z",
       "elapsed_ms": 120087
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "Win32 windowing and surface management",
+      "session_id": "opencode:ses_133be9282ffewXyZPtqNU0CgJy",
+      "agent": "general",
+      "updated_at": "2026-06-15T17:17:02.700Z",
+      "started_at": "2026-06-15T17:16:18.947Z",
+      "status": "completed",
+      "ended_at": "2026-06-15T17:17:02.700Z",
+      "elapsed_ms": 43753
     }
   },
   "schema_version": 2,
@@ -66,7 +78,7 @@
       "active_plan": "/Users/minjaekim/Plugins/gui/.omo/plans/rust-plugin-gui-framework.md",
       "plan_name": "rust-plugin-gui-framework",
       "started_at": "2026-06-15T13:49:47Z",
-      "updated_at": "2026-06-15T17:06:30.914Z",
+      "updated_at": "2026-06-15T17:17:02.700Z",
       "session_ids": [
         "opencode:ses_135f513edffeFut1BWMhwIUVU2"
       ],
@@ -122,10 +134,22 @@
           "status": "completed",
           "ended_at": "2026-06-15T17:06:30.914Z",
           "elapsed_ms": 120087
+        },
+        "todo:7": {
+          "task_key": "todo:7",
+          "task_label": "7",
+          "task_title": "Win32 windowing and surface management",
+          "session_id": "opencode:ses_133be9282ffewXyZPtqNU0CgJy",
+          "agent": "general",
+          "updated_at": "2026-06-15T17:17:02.700Z",
+          "started_at": "2026-06-15T17:16:18.947Z",
+          "status": "completed",
+          "ended_at": "2026-06-15T17:17:02.700Z",
+          "elapsed_ms": 43753
         }
       }
     }
   },
   "active_work_id": "rust-plugin-gui-framework-legacy",
-  "updated_at": "2026-06-15T17:06:30.914Z"
+  "updated_at": "2026-06-15T17:17:02.700Z"
 }

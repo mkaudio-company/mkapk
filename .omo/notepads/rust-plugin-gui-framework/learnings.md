@@ -54,4 +54,26 @@
   - `NSEventMask::NSAnyEventMask.bits()` is a method, not a field, in this `bitflags` version.
 - Verification: `cargo build --workspace` passes, `cargo test -p gui-test-host` passes (2 tests), and `cargo run -p gui-test-host --example blank -- --duration-ms 500` opens a window and prints `EditorAttached`/`EditorDetached` markers.
 
+## Task 11: gui-vst3 `IPlugView` wrapper
+
+- `vst3-sys` is not published on crates.io, so the dependency points to the `RustAudio/vst3-sys` git repository.
+- Implemented `PluginView` using `#[VST3(implements(IPlugView))]`, exposing the `IPlugView` trait from `vst3_sys::gui`.
+- The `vst3-sys` trait methods take `&self`, so the editor, frame, and size are stored with interior mutability (`RefCell` / `Cell`).
+- Platform type support is gated with `#[cfg(target_os = ...)]` for `"HWND"` on Windows and `"NSView"` / `"Cocoa"` on macOS.
+- `ViewHost` implements `EditorHost` and forwards `request_resize` to `IPlugFrame::resize_view` using a transmuted self-pointer for the view argument.
+- Added a compile-only unit test verifying the default view size.
+- Verification: `cargo build -p gui-vst3` exits 0, `cargo test -p gui-vst3` passes (1 test), `cargo clippy -p gui-vst3 -- -D warnings` passes.
+
+## Task 7: gui-win32 Win32 windowing and surface management
+
+- Implemented `Win32Window` in `crates/gui-win32/src/window.rs` wrapping an `HWND`.
+- Updated `crates/gui-win32/Cargo.toml` to enable the required `windows` crate features (`Win32_Foundation`, `Win32_Graphics_Gdi`, `Win32_System_LibraryLoader`, `Win32_UI_HiDpi`, `Win32_UI_WindowsAndMessaging`).
+- Set per-monitor DPI awareness via `SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)` at the start of `create`, ignoring errors.
+- Registered a `"GuiPluginEditorClass"` window class and created a child window with `WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN`.
+- Stored `EditorWindowState` (editor, host, size) in `GWLP_USERDATA` and forwarded `WNDPROC` messages to it.
+- Handled `WM_SIZE` (resize editor and repaint), `WM_DPICHANGED` (repaint), `WM_PAINT` (validate rect), `WM_DESTROY` (drop state and clear user data), plus `WM_LBUTTONDOWN`, `WM_LBUTTONUP`, `WM_MOUSEMOVE`, `WM_KEYDOWN`, `WM_KEYUP` with debug prints.
+- Implemented `client_size` using `GetClientRect`, `dpi` using `GetDpiForWindow` with a 96 fallback, and `request_repaint` using `InvalidateRect` + `UpdateWindow`.
+- Added `win32_window_exports` compile-only test.
+- Verification: `cargo test -p gui-win32` passes (1 test). `cargo build --workspace` cannot currently be verified on macOS because `gui-vst3` depends on `vst3-sys`, which is not published on crates.io; building the remaining workspace (with `gui-vst3` temporarily excluded) passes.
+
 

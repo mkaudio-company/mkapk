@@ -1,3 +1,4 @@
-pub fn gui_vst3_ready() -> bool {
-    true
-}
+#[cfg(feature = "vst3")]
+pub mod view;
+#[cfg(feature = "vst3")]
+pub use view::PluginView;

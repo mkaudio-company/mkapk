@@ -361,7 +361,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `chore(build): add xtask and GitHub Actions CI` | Files: `xtask/**`, `.github/workflows/**`, `.gitignore`
 
-- [ ] 7. Win32 windowing and surface management
+- [x] 7. Win32 windowing and surface management
 
   **What to do**: In `gui-win32`, implement `Win32Window` that registers a window class, creates a child `HWND` from a `ParentWindowHandle::Windows(HWND)`, handles `WM_SIZE`, `WM_DPICHANGED`, `WM_PAINT`, `WM_DESTROY`, and forwards mouse/keyboard messages to an event sink. Use `SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)` at thread creation. Store the `gui-host::PluginEditor` implementor as window user data. Provide a method to request repaint.
 
@@ -500,7 +500,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(core): add zero-allocation paint command list` | Files: `crates/gui-core/src/paint.rs`, `crates/gui-core/benches/paint_command.rs`
 
-- [ ] 11. VST3 plugin wrapper
+- [x] 11. VST3 plugin wrapper
 
   **What to do**: In `gui-vst3`, create an `IPlugView` implementation that wraps a `gui-host::PluginEditor`. Implement `IPlugView::attached`, `removed`, `onWheel`, `onKeyDown`, `onKeyUp`, `getSize`, `onSize`, `canResize`, `checkSizeConstraint`, `setFrame` (for host callbacks). Use the Steinberg VST3 SDK C++ interfaces via `vst3-sys`/`vst3-rs` bindings, or write minimal unsafe FFI if bindings are unavailable. Gate the crate on a `vst3` feature.
 

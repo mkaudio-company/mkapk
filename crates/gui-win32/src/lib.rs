@@ -1,3 +1,3 @@
-pub fn gui_win32_ready() -> bool {
-    true
-}
+pub mod window;
+
+pub use window::Win32Window;
