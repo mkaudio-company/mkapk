@@ -54,7 +54,16 @@
   - `NSEventMask::NSAnyEventMask.bits()` is a method, not a field, in this `bitflags` version.
 - Verification: `cargo build --workspace` passes, `cargo test -p gui-test-host` passes (2 tests), and `cargo run -p gui-test-host --example blank -- --duration-ms 500` opens a window and prints `EditorAttached`/`EditorDetached` markers.
 
-## Task 11: gui-vst3 `IPlugView` wrapper
+## Task 10: gui-core zero-allocation paint command list
+
+- Added `crates/gui-core/src/paint.rs` with `PaintCommand`, `CommandList`, `RenderBackend`, `ImageId`, `TextLayoutId`, and `ColorStop`.
+- `CommandList` is backed by `alloc::vec::Vec<PaintCommand>` and retains allocated capacity across `clear()` calls for zero-allocation frame reuse.
+- Path points and gradient stops use `&'static [Pointf]` / `&'static [ColorStop]` to stay allocation-free and `#![no_std]` compatible.
+- `RenderBackend` trait provides default empty bodies so it is object-safe and simple for `gui-mac`/`gui-win32` to implement later.
+- Added integration tests in `crates/gui-core/tests/paint_command.rs` exercising 10,000 pushes/clears and iteration.
+- Verification: `cargo test -p gui-core` passes (24 tests), `cargo clippy -p gui-core -- -D warnings` passes.
+
+
 
 - `vst3-sys` is not published on crates.io, so the dependency points to the `RustAudio/vst3-sys` git repository.
 - Implemented `PluginView` using `#[VST3(implements(IPlugView))]`, exposing the `IPlugView` trait from `vst3_sys::gui`.

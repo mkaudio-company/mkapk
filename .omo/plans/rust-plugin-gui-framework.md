@@ -467,7 +467,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(win32): add DirectWrite text rendering` | Files: `crates/gui-win32/src/text.rs`
 
-- [ ] 10. Zero-allocation paint command replay
+- [x] 10. Zero-allocation paint command replay
 
   **What to do**: In `gui-core`, define a `PaintCommand` enum and a `CommandList` backed by a `bumpalo::Bump` or fixed-size reusable buffer. Provide methods to push commands and clear without freeing underlying capacity. In `gui-win32`, implement `CommandList::replay(&self, backend: &mut D2DRenderBackend)`. Ensure the replay path performs no heap allocation after initialization.
 

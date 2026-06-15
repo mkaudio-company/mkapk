@@ -13,14 +13,14 @@
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "Workspace and crate skeleton",
-      "session_id": "opencode:ses_1341cc987ffeRcEn0zdVAort84",
+      "task_title": "Add `criterion = { version = \"0.5\", features = [\"html_reports\"] }` as a dev-dependency in `crates/gui-core/Cargo.toml`.",
+      "session_id": "opencode:ses_13271bdd6ffeZMWEASFDPtnEWF",
       "agent": "general",
       "started_at": "2026-06-15T14:22:08.772Z",
+      "ended_at": "2026-06-15T23:13:08.563Z",
+      "elapsed_ms": 31859791,
       "status": "completed",
-      "updated_at": "2026-06-15T15:29:31.551Z",
-      "ended_at": "2026-06-15T15:29:31.551Z",
-      "elapsed_ms": 4042779
+      "updated_at": "2026-06-15T23:13:08.563Z"
     },
     "todo:2": {
       "task_key": "todo:2",
@@ -74,12 +74,11 @@
       "task_key": "todo:8",
       "task_label": "8",
       "task_title": "Direct2D render backend",
-      "session_id": "opencode:ses_132ad5345ffelC3etpj13nr3Ut",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
+      "session_id": "opencode:ses_13273ac75ffeIXLzl4r5YYMc5z",
+      "agent": "general",
       "started_at": "2026-06-15T17:31:32.313Z",
       "status": "running",
-      "updated_at": "2026-06-15T22:36:48.558Z"
+      "updated_at": "2026-06-15T23:10:49.857Z"
     }
   },
   "schema_version": 2,
@@ -89,7 +88,7 @@
       "active_plan": "/Users/minjaekim/Plugins/gui/.omo/plans/rust-plugin-gui-framework.md",
       "plan_name": "rust-plugin-gui-framework",
       "started_at": "2026-06-15T13:49:47Z",
-      "updated_at": "2026-06-15T22:36:48.558Z",
+      "updated_at": "2026-06-15T23:13:08.563Z",
       "session_ids": [
         "opencode:ses_135f513edffeFut1BWMhwIUVU2"
       ],
@@ -101,14 +100,14 @@
         "todo:1": {
           "task_key": "todo:1",
           "task_label": "1",
-          "task_title": "Workspace and crate skeleton",
-          "session_id": "opencode:ses_1341cc987ffeRcEn0zdVAort84",
+          "task_title": "Add `criterion = { version = \"0.5\", features = [\"html_reports\"] }` as a dev-dependency in `crates/gui-core/Cargo.toml`.",
+          "session_id": "opencode:ses_13271bdd6ffeZMWEASFDPtnEWF",
           "agent": "general",
           "started_at": "2026-06-15T14:22:08.772Z",
+          "ended_at": "2026-06-15T23:13:08.563Z",
+          "elapsed_ms": 31859791,
           "status": "completed",
-          "updated_at": "2026-06-15T15:29:31.551Z",
-          "ended_at": "2026-06-15T15:29:31.551Z",
-          "elapsed_ms": 4042779
+          "updated_at": "2026-06-15T23:13:08.563Z"
         },
         "todo:2": {
           "task_key": "todo:2",
@@ -162,16 +161,15 @@
           "task_key": "todo:8",
           "task_label": "8",
           "task_title": "Direct2D render backend",
-          "session_id": "opencode:ses_132ad5345ffelC3etpj13nr3Ut",
-          "agent": "Sisyphus-Junior",
-          "category": "quick",
+          "session_id": "opencode:ses_13273ac75ffeIXLzl4r5YYMc5z",
+          "agent": "general",
           "started_at": "2026-06-15T17:31:32.313Z",
           "status": "running",
-          "updated_at": "2026-06-15T22:36:48.558Z"
+          "updated_at": "2026-06-15T23:10:49.857Z"
         }
       }
     }
   },
   "active_work_id": "rust-plugin-gui-framework-legacy",
-  "updated_at": "2026-06-15T22:36:48.558Z"
+  "updated_at": "2026-06-15T23:13:08.563Z"
 }
