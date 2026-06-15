@@ -135,8 +135,16 @@ where
         let max_x = (self.origin.x + self.size.width).min(other.origin.x + other.size.width);
         let max_y = (self.origin.y + self.size.height).min(other.origin.y + other.size.height);
 
-        let width = if max_x > min_x { max_x - min_x } else { T::default() };
-        let height = if max_y > min_y { max_y - min_y } else { T::default() };
+        let width = if max_x > min_x {
+            max_x - min_x
+        } else {
+            T::default()
+        };
+        let height = if max_y > min_y {
+            max_y - min_y
+        } else {
+            T::default()
+        };
 
         Self::new(Point::new(min_x, min_y), Size::new(width, height))
     }
@@ -154,16 +162,16 @@ where
         let max_x = (self.origin.x + self.size.width).max(other.origin.x + other.size.width);
         let max_y = (self.origin.y + self.size.height).max(other.origin.y + other.size.height);
 
-        Self::new(Point::new(min_x, min_y), Size::new(max_x - min_x, max_y - min_y))
+        Self::new(
+            Point::new(min_x, min_y),
+            Size::new(max_x - min_x, max_y - min_y),
+        )
     }
 }
 
 impl<T: Copy + Add<Output = T> + Sub<Output = T>> Rect<T> {
     pub fn inset(self, insets: Insets<T>) -> Self {
-        let origin = Point::new(
-            self.origin.x + insets.left,
-            self.origin.y + insets.top,
-        );
+        let origin = Point::new(self.origin.x + insets.left, self.origin.y + insets.top);
         let size = Size::new(
             self.size.width - insets.left - insets.right,
             self.size.height - insets.top - insets.bottom,
@@ -270,10 +278,7 @@ mod tests {
     fn rect_intersect() {
         let a = Rect::from_points(Point::new(0, 0), Point::new(10, 10));
         let b = Rect::from_points(Point::new(5, 5), Point::new(15, 15));
-        assert_eq!(
-            a.intersect(b),
-            Rect::new(Point::new(5, 5), Size::new(5, 5))
-        );
+        assert_eq!(a.intersect(b), Rect::new(Point::new(5, 5), Size::new(5, 5)));
     }
 
     #[test]
@@ -287,10 +292,7 @@ mod tests {
     fn rect_union() {
         let a = Rect::from_points(Point::new(0, 0), Point::new(4, 4));
         let b = Rect::from_points(Point::new(2, 2), Point::new(6, 6));
-        assert_eq!(
-            a.union(b),
-            Rect::new(Point::new(0, 0), Size::new(6, 6))
-        );
+        assert_eq!(a.union(b), Rect::new(Point::new(0, 0), Size::new(6, 6)));
     }
 
     #[test]

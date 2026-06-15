@@ -229,7 +229,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(core): add geometry, math, and color primitives` | Files: `crates/gui-core/src/**`
 
-- [ ] 3. Plugin host abstraction trait
+- [x] 3. Plugin host abstraction trait
 
   **What to do**: Define the `gui-host` crate. Create traits `PluginEditor`, `EditorHost`, and `ParameterGateway`. The editor trait must cover: `open(parent_handle)`, `close()`, `resize(size)`, `idle()`, `on_parameter_changed(id, normalized)`, `get_size_constraints()`. The host trait covers: `request_resize(size)`, `start_parameter_gesture(id)`, `end_parameter_gesture(id)`, `set_parameter_normalized(id, value)`. Include an enum `ParentWindowHandle` that wraps platform handles (HWND / NSView / id).
 
@@ -262,7 +262,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(host): define plugin editor and host abstraction traits` | Files: `crates/gui-host/src/**`
 
-- [ ] 4. Resource ID and embedded resource system skeleton
+- [x] 4. Resource ID and embedded resource system skeleton
 
   **What to do**: In `gui-res`, define a `ResourceId` type (newtype around `u32` or string hash) and a `ResourceBundle` trait with methods to fetch bytes by ID. Provide a proc-macro or `build.rs` helper that embeds files from a `resources/` directory as `&'static [u8]`. Support at least SVG source bytes, PNG bytes, and font bytes. The actual decoding happens in later tasks.
 
@@ -328,7 +328,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(test-host): add DAW-less test host skeleton` | Files: `crates/gui-test-host/src/**`, `crates/gui-test-host/examples/**`
 
-- [ ] 6. Build scripts and CI
+- [x] 6. Build scripts and CI
 
   **What to do**: Create an `xtask` crate with commands: `xtask test`, `xtask bundle-vst3`, `xtask bundle-au`, `xtask bundle-aax` (aax = build only), `xtask check`. Add a GitHub Actions workflow that runs on `windows-latest` and `macos-latest`, installs Rust stable, runs `cargo test --workspace`, runs `cargo clippy --workspace -- -D warnings`, and runs `cargo fmt --check`. Add `.gitignore` entries for `target/` and `.omo/evidence/`.
 
