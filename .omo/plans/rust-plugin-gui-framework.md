@@ -565,7 +565,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(vst3): add blank test-host example` | Files: `crates/gui-vst3/examples/gain.rs`
 
-- [ ] 13. Retained widget tree and lifecycle
+- [x] 13. Retained widget tree and lifecycle
 
   **What to do**: In `gui-core`, define the widget trait hierarchy: `Widget`, `Element`, `BuildContext`, `WidgetTree`. A widget has an ID, parent pointer, children vector, style/layout constraints, and state. Implement `Tree::insert`, `remove`, `find_by_id`, `traverse`, and lifecycle hooks (`mount`, `unmount`, `update`). Store the tree in `gui-host` and expose it to backends for rendering and hit-testing.
 

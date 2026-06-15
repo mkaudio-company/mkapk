@@ -1,6 +1,12 @@
 # Rust Plugin GUI Framework - Learnings
+## Task 13: gui-core retained widget tree and lifecycle
 
-## Task 2: gui-core primitives
+- Created `crates/gui-core/src/widget.rs` with `WidgetId` newtype around `u64`, `Widget` trait with lifecycle defaults, and `LayoutConstraints` placeholder.
+- Created `crates/gui-core/src/tree.rs` with `Tree` and `Node` storing `Box<dyn Widget>` plus parent/child links via `WidgetId`, supporting insert/remove with mount/unmount, find, root, children, and pre/post/breadth-first traversal.
+- Used `core::sync::atomic::AtomicU64` for ID generation, keeping the crate `#![no_std]` and `#![deny(unsafe_code)]`.
+- Added 4 tree unit tests covering insert/remove links, recursive unmount, traversal orders, and ID uniqueness.
+- Verification: `cargo test -p gui-core` passes (28 tests), `cargo clippy -p gui-core -- -D warnings` passes.
+
 
 - Implemented `geometry`, `transform`, `color`, and `units` modules in `crates/gui-core`.
 - Crate remains `#![no_std]` and `#![deny(unsafe_code)]` with no external dependencies.
@@ -128,6 +134,14 @@
 - Gated the macOS-specific rendering path with `#[cfg(target_os = "macos")]`; non-macOS builds print a message and exit.
 - Extended the `au_editor_exports` compile-only test to exercise `AuEditor::new`.
 - Verification: `cargo build -p gui-au --example gain`, `cargo run -p gui-au --example gain -- --test-host --duration-ms 1000` (prints `EditorAttached`/`EditorDetached`), and `cargo clippy -p gui-au -p gui-test-host -- -D warnings` all pass.
+
+## Task 13: gui-core retained widget tree and lifecycle
+
+- Created `crates/gui-core/src/widget.rs` with `WidgetId` newtype around `u64`, `Widget` trait with lifecycle defaults, and `LayoutConstraints` placeholder.
+- Created `crates/gui-core/src/tree.rs` with `Tree` and `Node` storing `Box<dyn Widget>` plus parent/child links via `WidgetId`, supporting insert/remove with mount/unmount, find, root, children, and pre/post/breadth-first traversal.
+- Used `core::sync::atomic::AtomicU64` for ID generation, keeping the crate `#![no_std]` and `#![deny(unsafe_code)]`.
+- Added 4 tree unit tests covering insert/remove links, recursive unmount, traversal orders, and ID uniqueness.
+- Verification: `cargo test -p gui-core` passes (28 tests), `cargo clippy -p gui-core -- -D warnings` passes.
 
 
 
