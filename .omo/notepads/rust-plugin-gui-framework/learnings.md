@@ -121,5 +121,13 @@
 - Added `render_text_to_view` to lock focus, fetch the current `NSGraphicsContext` CG context, and call `TextLayout::draw` directly.
 - Verification: `cargo build -p gui-mac`, `cargo test -p gui-mac`, `cargo run -p gui-test-host --example cg-text -- --duration-ms 1000`, and `cargo clippy -p gui-mac -p gui-test-host -- -D warnings` all pass.
 
+## Task 23: gui-au DAW-less test host example
+
+- Created `crates/gui-au/examples/gain.rs` implementing a minimal `PluginEditor` that renders a dark clear using `gui_mac::render_to_view` inside the test host window.
+- Added `gui-mac` and `gui-test-host` as dev-dependencies for `gui-au`; also added `gui-test-host` to the workspace root `[workspace.dependencies]` so `workspace = true` resolves.
+- Gated the macOS-specific rendering path with `#[cfg(target_os = "macos")]`; non-macOS builds print a message and exit.
+- Extended the `au_editor_exports` compile-only test to exercise `AuEditor::new`.
+- Verification: `cargo build -p gui-au --example gain`, `cargo run -p gui-au --example gain -- --test-host --duration-ms 1000` (prints `EditorAttached`/`EditorDetached`), and `cargo clippy -p gui-au -p gui-test-host -- -D warnings` all pass.
+
 
 

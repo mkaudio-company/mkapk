@@ -893,7 +893,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(au): add Audio Unit editor wrapper` | Files: `crates/gui-au/src/lib.rs`
 
-- [ ] 23. Blank AU example in test host
+- [x] 23. Blank AU example in test host
 
   **What to do**: Create a `gain` example in `gui-au/examples` that opens the same editor as the VST3 example. Wire it through `gui-test-host` and ensure it uses `gui-mac` for rendering.
 
