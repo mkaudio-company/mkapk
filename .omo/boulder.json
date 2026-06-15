@@ -1,0 +1,59 @@
+{
+  "active_plan": "/Users/minjaekim/Plugins/gui/.omo/plans/rust-plugin-gui-framework.md",
+  "started_at": "2026-06-15T13:49:47Z",
+  "session_ids": [
+    "opencode:ses_135f513edffeFut1BWMhwIUVU2"
+  ],
+  "plan_name": "rust-plugin-gui-framework",
+  "worktree_path": null,
+  "session_origins": {
+    "opencode:ses_135f513edffeFut1BWMhwIUVU2": "direct"
+  },
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Workspace and crate skeleton",
+      "session_id": "opencode:ses_1341cc987ffeRcEn0zdVAort84",
+      "agent": "general",
+      "started_at": "2026-06-15T14:22:08.772Z",
+      "status": "completed",
+      "updated_at": "2026-06-15T15:29:31.551Z",
+      "ended_at": "2026-06-15T15:29:31.551Z",
+      "elapsed_ms": 4042779
+    }
+  },
+  "schema_version": 2,
+  "works": {
+    "rust-plugin-gui-framework-legacy": {
+      "work_id": "rust-plugin-gui-framework-legacy",
+      "active_plan": "/Users/minjaekim/Plugins/gui/.omo/plans/rust-plugin-gui-framework.md",
+      "plan_name": "rust-plugin-gui-framework",
+      "started_at": "2026-06-15T13:49:47Z",
+      "updated_at": "2026-06-15T15:29:31.551Z",
+      "session_ids": [
+        "opencode:ses_135f513edffeFut1BWMhwIUVU2"
+      ],
+      "session_origins": {
+        "opencode:ses_135f513edffeFut1BWMhwIUVU2": "direct"
+      },
+      "worktree_path": null,
+      "task_sessions": {
+        "todo:1": {
+          "task_key": "todo:1",
+          "task_label": "1",
+          "task_title": "Workspace and crate skeleton",
+          "session_id": "opencode:ses_1341cc987ffeRcEn0zdVAort84",
+          "agent": "general",
+          "started_at": "2026-06-15T14:22:08.772Z",
+          "status": "completed",
+          "updated_at": "2026-06-15T15:29:31.551Z",
+          "ended_at": "2026-06-15T15:29:31.551Z",
+          "elapsed_ms": 4042779
+        }
+      }
+    }
+  },
+  "active_work_id": "rust-plugin-gui-framework-legacy",
+  "updated_at": "2026-06-15T15:29:31.551Z"
+}

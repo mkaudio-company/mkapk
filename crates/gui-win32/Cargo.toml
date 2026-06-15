@@ -1,0 +1,14 @@
+[package]
+name = "gui-win32"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+gui-core = { workspace = true }
+gui-host = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62.2", default-features = false }
