@@ -130,8 +130,10 @@ name = "gui-au"
 version = "0.1.0"
 dependencies = [
  "cocoa",
+ "core-foundation",
  "gui-core",
  "gui-host",
+ "objc",
 ]
 
 [[package]]
@@ -152,6 +154,7 @@ dependencies = [
  "cocoa",
  "gui-core",
  "gui-host",
+ "objc",
 ]
 
 [[package]]
