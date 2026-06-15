@@ -827,7 +827,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(mac): add CoreGraphics render backend` | Files: `crates/gui-mac/src/render.rs`
 
-- [ ] 21. CoreText text rendering
+- [x] 21. CoreText text rendering
 
   **What to do**: In `gui-mac`, add a `TextLayout` type backed by `CTLine`/`CTFramesetter`. Load custom fonts from embedded bytes via `CTFontManagerRegisterGraphicsFont`. Cache layouts by content + size + font key. Report metrics (width, height, baseline) and render into the CoreGraphics context.
 

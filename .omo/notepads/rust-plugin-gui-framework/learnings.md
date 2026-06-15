@@ -110,5 +110,16 @@
 - Added a non-macOS stub so `gui-mac` still compiles on other platforms.
 - Verification: `cargo build -p gui-mac`, `cargo test -p gui-mac`, `cargo run -p gui-test-host --example cg-rect -- --duration-ms 1000`, and `cargo clippy -p gui-mac -p gui-test-host -- -D warnings` all pass.
 
+## Task 21: gui-mac CoreText text rendering
+
+- Added `TextLayout` wrapping a `CTFont` and `CTLine`, with `size`, `baseline`, and `draw` methods.
+- `core-text` 20.1 depends on `core-graphics` 0.23 / `core-foundation` 0.9, which conflicts with the workspace's `core-graphics` 0.24 / `core-foundation` 0.10. Used `core-text` 21.0 instead for compatibility.
+- `core-foundation` 0.10's `CFAttributedString::new` no longer accepts attributes; use `CFMutableAttributedString`, `replace_str`, and `set_attribute` with `kCTFontAttributeName`.
+- `kCTFontAttributeName` is an `extern static`, so it needs an `unsafe` block to read.
+- `CTLine::draw` takes `&CGContext` (owned), not `&CGContextRef`; pass the context directly.
+- CoreText draws from the baseline. With the backend's flipped Y axis, place the text position at `top_left.y + ascent`.
+- Added `render_text_to_view` to lock focus, fetch the current `NSGraphicsContext` CG context, and call `TextLayout::draw` directly.
+- Verification: `cargo build -p gui-mac`, `cargo test -p gui-mac`, `cargo run -p gui-test-host --example cg-text -- --duration-ms 1000`, and `cargo clippy -p gui-mac -p gui-test-host -- -D warnings` all pass.
+
 
 
