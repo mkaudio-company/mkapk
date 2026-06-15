@@ -349,6 +349,8 @@ name = "gui-mac"
 version = "0.1.0"
 dependencies = [
  "cocoa",
+ "core-graphics",
+ "foreign-types",
  "gui-core",
  "gui-host",
  "objc",
@@ -369,6 +371,7 @@ dependencies = [
  "core-graphics",
  "gui-core",
  "gui-host",
+ "gui-mac",
  "objc",
  "windows",
 ]
