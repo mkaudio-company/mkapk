@@ -102,11 +102,9 @@ impl Drop for MacWindow {
 }
 
 #[cfg(target_os = "macos")]
-use cocoa::appkit::{
-    NSBackingStoreBuffered, NSView, NSWindow, NSWindowStyleMask,
-};
+use cocoa::appkit::{NSBackingStoreBuffered, NSView, NSWindow, NSWindowStyleMask};
 #[cfg(target_os = "macos")]
-use cocoa::base::{id, nil, NO, YES};
+use cocoa::base::{NO, YES, id, nil};
 #[cfg(target_os = "macos")]
 use cocoa::foundation::{NSPoint, NSRect, NSSize};
 #[cfg(target_os = "macos")]
@@ -199,10 +197,7 @@ unsafe fn bounds_mac(window: &MacWindow) -> gui_core::Rectf {
     let nsrect: NSRect = msg_send![view, bounds];
 
     if let Some(state) = state_for_view(view) {
-        let size = gui_core::Sizef::new(
-            nsrect.size.width as f32,
-            nsrect.size.height as f32,
-        );
+        let size = gui_core::Sizef::new(nsrect.size.width as f32, nsrect.size.height as f32);
         if size != (*state).last_size {
             (*state).last_size = size;
             (*state).editor.resize(size);
@@ -217,7 +212,10 @@ unsafe fn bounds_mac(window: &MacWindow) -> gui_core::Rectf {
 
 #[cfg(target_os = "macos")]
 fn register_view_did_resize(view: id, state: *mut EditorWindowState) {
-    STATE_MAP.lock().unwrap().insert(view as usize, state as usize);
+    STATE_MAP
+        .lock()
+        .unwrap()
+        .insert(view as usize, state as usize);
 }
 
 #[cfg(target_os = "macos")]
