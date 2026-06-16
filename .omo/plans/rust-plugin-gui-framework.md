@@ -697,7 +697,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(host): add lock-free parameter gateway` | Files: `crates/gui-host/src/parameter.rs`
 
-- [ ] 17. Basic controls (slider, knob, button, label)
+- [x] 17. Basic controls (slider, knob, button, label)
 
   **What to do**: In `gui-core` or a new `gui-widgets` crate, implement `Slider`, `Knob`, `Button`, and `Label` widgets. Each widget uses the layout system, paints via the command list, and wires events to parameter binding where applicable. Provide a default theme (colors, spacing, font) and support disabled states.
 

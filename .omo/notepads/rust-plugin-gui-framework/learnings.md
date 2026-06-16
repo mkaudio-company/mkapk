@@ -171,3 +171,16 @@
 - Added `Ord`/`PartialOrd` to `ParameterId` so it can be used as a `BTreeMap` key.
 - Added 4 unit tests covering UI→audio ordering, audio→UI draining, latest value reads, and bounded-channel backpressure (`TrySendError::Full`).
 - Verification: `cargo test -p gui-host` passes (9 tests), `cargo clippy -p gui-host -- -D warnings` passes, `cargo fmt -p gui-host` applied.
+
+## Task 17: basic controls (slider, knob, button, label)
+
+- Created new `crates/gui-widgets` crate, wired into the workspace root and `gui-test-host` dependencies.
+- Crate is `#![deny(unsafe_code)]` and depends only on `gui-core` and `gui-host` (no platform-specific crates).
+- Added `Theme` with dark defaults and implemented `Slider`, `Knob`, `Button`, and `Label` as `Widget` implementations.
+- Each control stores a generated `WidgetId`, an optional change callback, and a `Cell<Rectf>` frame so the example can set layout boxes after measurement.
+- `Slider` maps horizontal mouse position to a normalized value; `Knob` maps vertical position; `Button` triggers a click callback; `Label` emits `PaintCommand::DrawText` with `TextLayoutId(0)`.
+- Added `gui_core::downcast_widget_ref`/`downcast_widget_mut` helpers after making `Widget: Any`, enabling the example editor to set frames on concrete control types stored in the retained tree.
+- Created `crates/gui-test-host/examples/controls.rs` with a `ControlsEditor` that builds a tree, runs layout on resize, paints controls, and calls `gui_mac::render_to_view` each frame.
+- Added 4 unit tests in `crates/gui-widgets/src/lib.rs` verifying each control constructs and implements `Widget`.
+- Verification: `cargo test -p gui-widgets` passes (4 tests), `cargo run -p gui-test-host --example controls -- --duration-ms 1000` opens a window and exits cleanly, and `cargo clippy -p gui-widgets -p gui-test-host -- -D warnings` passes.
+
