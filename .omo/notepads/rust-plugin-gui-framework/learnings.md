@@ -145,3 +145,8 @@
 
 
 
+## Task: gui-core layout engine wired
+
+- Wired `crates/gui-core/src/layout.rs` into `gui-core` by adding `pub mod layout` and re-exporting `Alignment`, `LayoutBox`, `LayoutDirection`, `LayoutEngine`, `LayoutNode`, and `LayoutResult` from `crates/gui-core/src/lib.rs`.
+- Kept `#![no_std]` and `#![deny(unsafe_code)]` intact.
+- Verification: `cargo test -p gui-core` passes (33 tests), `cargo clippy -p gui-core -- -D warnings` passes.

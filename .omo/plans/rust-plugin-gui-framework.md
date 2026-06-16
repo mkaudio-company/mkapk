@@ -598,7 +598,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(core): add retained widget tree and lifecycle` | Files: `crates/gui-core/src/tree.rs`, `crates/gui-core/src/widget.rs`
 
-- [ ] 14. Layout system
+- [x] 14. Layout system
 
   **What to do**: Implement a box/flex-style layout engine in `gui-core`. Define `LayoutConstraints`, `BoxLayout`, `FlexLayout`, and a `LayoutEngine` that computes `LayoutBox` (position + size) for every node. Support width/height, min/max, padding, margin, flex-grow, and alignment. Layout runs on demand when constraints change and produces a read-only `LayoutResult`.
 
