@@ -1,5 +1,6 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
+use crate::event::{EventResponse, KeyEvent, MouseEvent, PointerEvent};
 use crate::{CommandList, Pointf, Sizef};
 
 static WIDGET_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -24,6 +25,21 @@ pub trait Widget {
     }
     fn hit_test(&self, _point: Pointf) -> bool {
         false
+    }
+    fn on_mouse_down(&mut self, _event: &MouseEvent) -> EventResponse {
+        EventResponse::Bubble
+    }
+    fn on_mouse_up(&mut self, _event: &MouseEvent) -> EventResponse {
+        EventResponse::Bubble
+    }
+    fn on_mouse_move(&mut self, _event: &PointerEvent) -> EventResponse {
+        EventResponse::Bubble
+    }
+    fn on_key_down(&mut self, _event: &KeyEvent) -> EventResponse {
+        EventResponse::Bubble
+    }
+    fn on_key_up(&mut self, _event: &KeyEvent) -> EventResponse {
+        EventResponse::Bubble
     }
 }
 
