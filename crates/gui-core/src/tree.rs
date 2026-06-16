@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
+use core::cell::RefCell;
 
 use crate::{Widget, WidgetId};
 
@@ -12,7 +13,7 @@ pub enum TraverseOrder {
 }
 
 pub struct Node {
-    pub widget: Box<dyn Widget>,
+    pub widget: RefCell<Box<dyn Widget>>,
     pub parent: Option<WidgetId>,
     pub children: Vec<WidgetId>,
 }
@@ -49,13 +50,13 @@ impl Tree {
         self.nodes.insert(
             id,
             Node {
-                widget,
+                widget: RefCell::new(widget),
                 parent,
                 children: Vec::new(),
             },
         );
         if let Some(node) = self.nodes.get_mut(&id) {
-            node.widget.mount();
+            node.widget.borrow_mut().mount();
         }
         id
     }
@@ -75,9 +76,9 @@ impl Tree {
         if self.root == Some(id) {
             self.root = None;
         }
-        let mut node = self.nodes.remove(&id)?;
-        node.widget.unmount();
-        Some(node.widget)
+        let node = self.nodes.remove(&id)?;
+        node.widget.borrow_mut().unmount();
+        Some(node.widget.into_inner())
     }
 
     pub fn find(&self, id: WidgetId) -> Option<&Node> {

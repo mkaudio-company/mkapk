@@ -101,7 +101,7 @@ impl LayoutEngine {
 
         let widget_size = tree
             .find(id)
-            .map(|n| n.widget.layout(effective))
+            .map(|n| n.widget.borrow().layout(effective))
             .unwrap_or_default();
         let size = clamp_size(node.preferred_size.unwrap_or(widget_size), effective);
         measured.insert(id, size);
