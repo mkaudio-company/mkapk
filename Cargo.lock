@@ -398,6 +398,7 @@ dependencies = [
  "gui-core",
  "gui-host",
  "gui-mac",
+ "gui-widgets",
  "objc",
  "windows",
 ]
@@ -409,6 +410,14 @@ dependencies = [
  "gui-core",
  "gui-host",
  "vst3-sys",
+]
+
+[[package]]
+name = "gui-widgets"
+version = "0.1.0"
+dependencies = [
+ "gui-core",
+ "gui-host",
 ]
 
 [[package]]

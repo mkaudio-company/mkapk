@@ -10,6 +10,7 @@ members = [
     "crates/gui-au",
     "crates/gui-aax",
     "crates/gui-test-host",
+    "crates/gui-widgets",
     "xtask",
 ]
 resolver = "3"
@@ -28,3 +29,4 @@ gui-res = { path = "crates/gui-res" }
 gui-accessibility = { path = "crates/gui-accessibility" }
 gui-mac = { path = "crates/gui-mac" }
 gui-test-host = { path = "crates/gui-test-host" }
+gui-widgets = { path = "crates/gui-widgets" }
