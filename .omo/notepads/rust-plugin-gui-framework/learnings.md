@@ -184,3 +184,15 @@
 - Added 4 unit tests in `crates/gui-widgets/src/lib.rs` verifying each control constructs and implements `Widget`.
 - Verification: `cargo test -p gui-widgets` passes (4 tests), `cargo run -p gui-test-host --example controls -- --duration-ms 1000` opens a window and exits cleanly, and `cargo clippy -p gui-widgets -p gui-test-host -- -D warnings` passes.
 
+## Task 18: parameter-bound example plugin
+
+- Extended `crates/gui-au/examples/gain.rs` to use the widget and parameter-binding infrastructure.
+- Added `gui-widgets` as a dev-dependency for `gui-au`.
+- `GainEditor` now owns a `Tree` (root `Panel`, `Label`, and `Slider` bound to `ParameterId(1)`), a `LayoutEngine`, a `LayoutResult`, and an `Arc<LockFreeParameterGateway>`.
+- The slider's `on_changed` callback calls `gateway.set_normalized(id, value)` and prints the new value in dB (`20.0 * log10(value)`), guarding against zero.
+- Layout is computed in `new` and recomputed on `resize`; frames are applied to concrete widget types via `downcast_widget_ref`.
+- `idle` rebuilds paint commands from the tree and renders via `gui_mac::render_to_view`.
+- Added a unit test in `crates/gui-au/src/editor.rs` that creates a `Slider`, wires its callback to a shared `Vec`, simulates a mouse down at x=50 inside a 100px-wide slider frame, and verifies the callback receives a normalized value between 0.4 and 0.6.
+- The example is kept `#![deny(unsafe_code)]` by avoiding the macOS-specific backing-scale Objective-C call and using a fixed 1.0 scale factor.
+- Verification: `cargo run -p gui-au --example gain -- --test-host --duration-ms 1000` prints `EditorAttached`/`EditorDetached`, `cargo test -p gui-au` passes (2 tests), and `cargo clippy -p gui-au -p gui-test-host -- -D warnings` passes.
+

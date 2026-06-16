@@ -729,7 +729,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(widgets): add slider, knob, button, label controls` | Files: `crates/gui-core/src/widgets/**` or `crates/gui-widgets/src/**`
 
-- [ ] 18. Parameter-bound example plugin
+- [x] 18. Parameter-bound example plugin
 
   **What to do**: Extend the `gain` example to include a slider bound to a gain parameter and a label showing the value in dB. The example should run in `gui-test-host` and as a VST3. Add a simple automated test that drags the slider and verifies parameter gateway output.
 
