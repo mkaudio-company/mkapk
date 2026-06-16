@@ -1,3 +1,4 @@
+use core::any::Any;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::event::{EventResponse, KeyEvent, MouseEvent, PointerEvent};
@@ -14,7 +15,7 @@ impl WidgetId {
     }
 }
 
-pub trait Widget {
+pub trait Widget: Any {
     fn id(&self) -> WidgetId;
     fn mount(&mut self) {}
     fn unmount(&mut self) {}
@@ -41,6 +42,14 @@ pub trait Widget {
     fn on_key_up(&mut self, _event: &KeyEvent) -> EventResponse {
         EventResponse::Bubble
     }
+}
+
+pub fn downcast_widget_ref<T: Widget>(widget: &dyn Widget) -> Option<&T> {
+    (widget as &dyn Any).downcast_ref::<T>()
+}
+
+pub fn downcast_widget_mut<T: Widget>(widget: &mut dyn Widget) -> Option<&mut T> {
+    (widget as &mut dyn Any).downcast_mut::<T>()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

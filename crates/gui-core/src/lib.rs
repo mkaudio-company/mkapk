@@ -24,4 +24,4 @@ pub use paint::{ColorStop, CommandList, ImageId, PaintCommand, RenderBackend, Te
 pub use transform::Transform;
 pub use tree::{TraverseOrder, Tree};
 pub use units::{Dp, Px};
-pub use widget::{LayoutConstraints, Widget, WidgetId};
+pub use widget::{LayoutConstraints, Widget, WidgetId, downcast_widget_mut, downcast_widget_ref};
