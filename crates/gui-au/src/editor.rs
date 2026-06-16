@@ -251,4 +251,62 @@ mod tests {
         let _ = std::mem::size_of::<AuEditor>();
         let _ = std::mem::size_of_val(&AuEditor::new(Box::new(DummyEditor)));
     }
+
+    #[test]
+    fn slider_mouse_down_invokes_parameter_callback() {
+        use gui_core::{
+            Event, EventDispatcher, EventResponse, LayoutConstraints, LayoutEngine, LayoutNode,
+            Modifiers, MouseButton, MouseEvent, Pointf, Rectf, Tree, Widget,
+        };
+        use gui_widgets::{Slider, Theme};
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let slider = Slider::new(ParameterId(1), NormalizedValue::new(0.0), Theme::default());
+        let slider_id = slider.id();
+
+        let values: Rc<RefCell<Vec<f64>>> = Rc::new(RefCell::new(Vec::new()));
+        let values_for_cb = values.clone();
+        slider.on_changed(move |_id, value| {
+            values_for_cb.borrow_mut().push(value.get());
+        });
+
+        let mut tree = Tree::new();
+        tree.insert(Box::new(slider), None);
+
+        let mut engine = LayoutEngine::new();
+        engine.set_node(LayoutNode {
+            id: slider_id,
+            ..LayoutNode::default()
+        });
+        let layout = engine.compute(
+            &tree,
+            LayoutConstraints {
+                min_width: Some(100.0),
+                max_width: Some(100.0),
+                min_height: Some(24.0),
+                max_height: Some(24.0),
+            },
+        );
+
+        let layout_box = layout.get(slider_id).unwrap();
+        let slider_node = tree.find(slider_id).unwrap();
+        let widget = slider_node.widget.borrow();
+        let slider_ref = gui_core::downcast_widget_ref::<gui_widgets::Slider>(&**widget).unwrap();
+        slider_ref.set_frame(Rectf::new(layout_box.origin, layout_box.size));
+        drop(widget);
+
+        let mut dispatcher = EventDispatcher::new(&tree, &layout);
+        let response = dispatcher.dispatch(Event::MouseDown(MouseEvent {
+            button: MouseButton::Left,
+            position: Pointf::new(50.0, 12.0),
+            modifiers: Modifiers::default(),
+            click_count: 1,
+        }));
+
+        assert_eq!(response, EventResponse::Handled);
+        let captured = values.borrow();
+        assert_eq!(captured.len(), 1);
+        assert!(captured[0] > 0.4 && captured[0] < 0.6);
+    }
 }

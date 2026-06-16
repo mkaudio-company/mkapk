@@ -350,6 +350,7 @@ dependencies = [
  "gui-host",
  "gui-mac",
  "gui-test-host",
+ "gui-widgets",
  "objc",
 ]
 
