@@ -150,3 +150,13 @@
 - Wired `crates/gui-core/src/layout.rs` into `gui-core` by adding `pub mod layout` and re-exporting `Alignment`, `LayoutBox`, `LayoutDirection`, `LayoutEngine`, `LayoutNode`, and `LayoutResult` from `crates/gui-core/src/lib.rs`.
 - Kept `#![no_std]` and `#![deny(unsafe_code)]` intact.
 - Verification: `cargo test -p gui-core` passes (33 tests), `cargo clippy -p gui-core -- -D warnings` passes.
+
+## Task 15: gui-core mouse and keyboard event routing
+
+- Created `crates/gui-core/src/event.rs` with platform-agnostic input types (`MouseButton`, `KeyCode`, `Modifiers`), event structs (`MouseEvent`, `KeyEvent`, `PointerEvent`), the `Event` enum, and `EventResponse` (`Handled` / `Bubble`).
+- Extended the `Widget` trait in `crates/gui-core/src/widget.rs` with optional `on_mouse_down`, `on_mouse_up`, `on_mouse_move`, `on_key_down`, and `on_key_up` handlers defaulting to `Bubble`.
+- Implemented `EventDispatcher` with hit-testing against `LayoutResult` boxes (deepest widget first), bubbling up the parent chain, and mouse capture support.
+- Wired `Tree` widgets through `RefCell<Box<dyn Widget>>` so `EventDispatcher` can mutate widget state while holding an immutable `&Tree` reference, keeping dispatch safe without `unsafe`.
+- Updated `LayoutEngine::measure` to borrow widget references from the `RefCell`.
+- Added 5 unit tests covering deepest-leaf hit-testing, outside-hit bubble, handled-event stop, keyboard dispatch to root, and mouse capture redirection.
+- Verification: `cargo test -p gui-core` passes (36 unit + 2 integration tests), `cargo clippy -p gui-core -- -D warnings` passes, `cargo fmt -p gui-core` applied.

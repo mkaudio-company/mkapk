@@ -631,7 +631,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(core): add box/flex layout engine` | Files: `crates/gui-core/src/layout.rs`
 
-- [ ] 15. Mouse and keyboard event routing
+- [x] 15. Mouse and keyboard event routing
 
   **What to do**: Define `Event`, `MouseEvent`, `KeyEvent`, `PointerEvent` types in `gui-core`. Implement hit-testing against the `LayoutResult` and route events down the widget tree, calling `on_mouse_down`, `on_mouse_up`, `on_mouse_move`, `on_key_down`, etc. Support mouse capture, bubbling, and event consumption. Platform backends (`gui-win32`, `gui-mac`) translate native events to `gui-core` events.
 
