@@ -5,6 +5,7 @@ extern crate alloc;
 
 pub mod color;
 pub mod geometry;
+pub mod layout;
 pub mod paint;
 pub mod transform;
 pub mod tree;
@@ -13,6 +14,7 @@ pub mod widget;
 
 pub use color::{BLACK, BLUE, Color, GREEN, RED, TRANSPARENT, WHITE};
 pub use geometry::{Insets, Insetsf, Point, Pointf, Rect, Rectf, Size, Sizef};
+pub use layout::{Alignment, LayoutBox, LayoutDirection, LayoutEngine, LayoutNode, LayoutResult};
 pub use paint::{ColorStop, CommandList, ImageId, PaintCommand, RenderBackend, TextLayoutId};
 pub use transform::Transform;
 pub use tree::{TraverseOrder, Tree};
