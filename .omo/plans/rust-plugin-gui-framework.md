@@ -924,7 +924,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(au): add blank test-host example` | Files: `crates/gui-au/examples/gain.rs`
 
-- [ ] 24. Embedded resource system
+- [x] 24. Embedded resource system
 
   **What to do**: Expand `gui-res` to support runtime resource loading and caching. Define `Resource<T>` types for `Image`, `Svg`, and `Font`. Provide a registry that maps `ResourceId` to decoded objects, with reference counting and eviction. Integrate with the build-time embedding from task 4 so resources can be loaded either from embedded bytes or from files during development.
 
@@ -957,7 +957,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(res): add typed resource registry and caching` | Files: `crates/gui-res/src/registry.rs`
 
-- [ ] 25. SVG renderer
+- [x] 25. SVG renderer
 
   **What to do**: In `gui-res` or `gui-core`, integrate `resvg`/`usvg` to parse SVG source and rasterize to a `tiny-skia::Pixmap`. Cache the decoded tree (`usvg::Tree`) and the rasterized bitmap. Provide a `SvgImage` resource that backends can upload to a texture/bitmap. Expose `render(size)` to produce a backend-ready image at a given resolution.
 
@@ -1056,7 +1056,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(core): add animation engine with curves` | Files: `crates/gui-core/src/animation.rs`
 
-- [ ] 28. Accessibility metadata
+- [x] 28. Accessibility metadata
 
   **What to do**: In `gui-core`, add accessibility fields to every widget: `role` (button, slider, label, etc.), `label`, `value`, `state` (disabled, hidden, checked), and `bounds`. Define an `AccessibilityNode` tree that mirrors the widget tree and can be queried by platform accessibility backends.
 
@@ -1187,7 +1187,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(widgets): add custom GPU drawing surface` | Files: `crates/gui-core/src/widgets/gpu_surface.rs`, `crates/gui-win32/src/gpu.rs`, `crates/gui-mac/src/gpu.rs`
 
-- [ ] 32. AAX plugin wrapper
+- [x] 32. AAX plugin wrapper
 
   **What to do**: In `gui-aax`, create an `AAX_CEffectGUI` or `AAX_IEffectGUI` implementation that wraps `gui-host::PluginEditor`. Implement `CreateViewContainer`, `GetViewSize`, `Draw`, `TimerWakeup`, and parameter callbacks. This crate must be gated behind an `aax` feature and must not be built unless the AAX SDK path is provided via environment variable. Document that runtime validation requires Pro Tools and a PACE/iLok dev license.
 

@@ -196,3 +196,42 @@
 - The example is kept `#![deny(unsafe_code)]` by avoiding the macOS-specific backing-scale Objective-C call and using a fixed 1.0 scale factor.
 - Verification: `cargo run -p gui-au --example gain -- --test-host --duration-ms 1000` prints `EditorAttached`/`EditorDetached`, `cargo test -p gui-au` passes (2 tests), and `cargo clippy -p gui-au -p gui-test-host -- -D warnings` passes.
 
+## Task 24: gui-res typed resource registry and caching
+
+- Created `crates/gui-res/src/registry.rs` with `ResourceHandle<T>` wrapping `std::sync::Arc<T>`, `Resource` trait, marker types `Image`, `Svg`, and `Font`, and `ResourceRegistry` caching typed decoded resources and raw bytes in `BTreeMap`s keyed by `ResourceId`.
+- Added `ResourceRegistry::new`, `register_bytes`, `load`, `get`, and `evict`; `load` returns cached handles and decodes from raw bytes on first use.
+- Added `EmbeddedBundle::register_with` to bulk-register embedded raw bytes into a registry.
+- Re-exported `registry::{Resource, ResourceHandle, ResourceRegistry, Image, Svg, Font}` from `crates/gui-res/src/lib.rs`.
+- Added `Ord`/`PartialOrd` to `ResourceId` so it can be used as a `BTreeMap` key.
+- Added 4 unit tests covering raw-byte loading, cached Arc reuse, eviction, and embedded bundle registration.
+## Task 28: gui-core accessibility metadata
+
+- Created `crates/gui-core/src/accessibility.rs` with `Role`, bitflags-like `State`, `AccessibilityNode`, and `AccessibilityTree`, all using `alloc` types and staying `#![no_std]`.
+- Implemented `Display` for `AccessibilityNode` (and `State`) so tests can serialize nodes without `serde`.
+- Extended the `Widget` trait with a default `accessibility()` method returning an `AccessibilityNode` with `Role::None`.
+- Added `Tree::accessibility_tree()` that mirrors the widget tree, applying bounds from an optional stored `LayoutResult` and falling back to zero bounds.
+- Updated `Slider`, `Knob`, `Button`, and `Label` in `gui-widgets` to override `accessibility()` with their roles, labels, and values (slider value as a percentage).
+- Added `Slider::set_label` and `Knob::set_label` so callers can provide accessibility labels without changing constructors.
+- Added unit tests in `gui-core` (tree with panel/slider/label) and `gui-widgets` (per-control accessibility).
+- Verification: `cargo test -p gui-core` passes (40 tests), `cargo test -p gui-widgets` passes (9 tests), `cargo clippy -p gui-core -p gui-widgets -- -D warnings` passes, `cargo fmt -p gui-core -p gui-widgets` applied.
+
+## Task 25: gui-res SVG renderer
+
+- Created `crates/gui-res/src/svg.rs` with `SvgImage`, storing a decoded `usvg::Tree` and an optional rasterized `tiny_skia::Pixmap` cache.
+- Implemented `Resource` for `SvgImage` by parsing bytes as UTF-8 and calling `usvg::Tree::from_str` with default options.
+- Added `tree`, `width`, `height`, `render`, and `render_rgba` methods; `render` caches the pixmap and reuses it when the same size is requested.
+- Wired `pub mod svg` and re-exported `SvgImage` from `crates/gui-res/src/lib.rs`.
+- Added `resvg = "0.47"`, `usvg = "0.47"`, and `tiny-skia = "0.12"` to `crates/gui-res/Cargo.toml` while keeping `#![deny(unsafe_code)]`.
+- Added unit tests verifying intrinsic size, rendered RGBA byte length/non-zero alpha, and pixmap cache reuse.
+- Verification: `cargo test -p gui-res` passes (8 tests), `cargo clippy -p gui-res -- -D warnings` passes, `cargo fmt -p gui-res` applied.
+
+## Task 32: gui-aax AAX plugin wrapper
+
+- Created `crates/gui-aax/build.rs` that reads `AAX_SDK` at build time. When set, it emits `cfg(aax_sdk)` and links `{AAX_SDK}/Libs`; otherwise it prints a cargo warning and the crate builds as a no-op stub.
+- Updated `crates/gui-aax/Cargo.toml` with an optional `aax` feature (default off), `gui-core`/`gui-host` dependencies, and platform-gated dev-dependencies (`gui-mac` on macOS, `gui-win32` on Windows, plus `gui-test-host` and `gui-widgets`).
+- Implemented `AaxEditor` in `crates/gui-aax/src/lib.rs` wrapping `Box<dyn PluginEditor>` and an optional `Box<dyn EditorHost>`, with lifecycle methods (`create_view`, `view_size`, `draw`, `timer_wakeup`, `set_parameter`, `destroy_view`) that delegate to the editor when `aax_sdk` is absent.
+- Added `#![cfg_attr(not(aax_sdk), deny(unsafe_code))]` so unsafe code is only allowed when the real SDK is present.
+- Created `crates/gui-aax/examples/gain.rs` reusing the `gui-au` example pattern: macOS runs through `gui-test-host` + `gui-mac::render_to_view`; Windows attempts `gui-win32::Win32Window::create` inside a test-host window and falls back to "AAX stub on Windows"; other platforms print a message and exit.
+- Added compile-only `aax_editor_lifecycle` unit test constructing `AaxEditor` with a mock editor.
+- Fixed a pre-existing `gui-core` `#![no_std]` compile issue by importing `alloc::string::ToString` in `crates/gui-core/src/accessibility.rs`.
+- Verification: `cargo test -p gui-aax`, `cargo build -p gui-aax`, `cargo clippy -p gui-aax -- -D warnings`, `cargo run -p gui-aax --example gain -- --test-host --duration-ms 1000`, and `cargo fmt -p gui-aax` all pass.

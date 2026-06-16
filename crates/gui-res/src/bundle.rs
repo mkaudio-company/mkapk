@@ -1,4 +1,4 @@
-use crate::ResourceId;
+use crate::{ResourceId, ResourceRegistry};
 
 /// A collection of embedded resources addressable by [`ResourceId`].
 pub trait ResourceBundle {
@@ -21,6 +21,12 @@ impl EmbeddedBundle {
     /// Create a new embedded bundle from a static slice of entries.
     pub const fn new(entries: &'static [(ResourceId, &'static [u8])]) -> Self {
         Self { entries }
+    }
+
+    pub fn register_with(&self, registry: &mut ResourceRegistry) {
+        for (id, bytes) in self.entries {
+            registry.register_bytes(*id, bytes);
+        }
     }
 }
 

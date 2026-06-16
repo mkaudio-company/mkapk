@@ -2,8 +2,8 @@ use core::cell::Cell;
 use core::f32::consts::PI;
 
 use gui_core::{
-    CommandList, EventResponse, LayoutConstraints, MouseButton, MouseEvent, PaintCommand,
-    PointerEvent, Pointf, Rectf, Sizef, Widget, WidgetId,
+    AccessibilityNode, CommandList, EventResponse, LayoutConstraints, MouseButton, MouseEvent,
+    PaintCommand, PointerEvent, Pointf, Rectf, Role, Sizef, Widget, WidgetId,
 };
 use gui_host::{NormalizedValue, ParameterId};
 
@@ -18,6 +18,7 @@ pub struct Knob {
     id: WidgetId,
     parameter_id: ParameterId,
     value: Cell<NormalizedValue>,
+    label: Option<String>,
     theme: Theme,
     frame: Cell<Rectf>,
     on_change: Cell<ParameterCallback>,
@@ -29,6 +30,7 @@ impl Knob {
             id: WidgetId::new(),
             parameter_id,
             value: Cell::new(value),
+            label: None,
             theme,
             frame: Cell::new(Rectf::default()),
             on_change: Cell::new(None),
@@ -45,6 +47,10 @@ impl Knob {
 
     pub fn set_value(&self, value: NormalizedValue) {
         self.value.set(value);
+    }
+
+    pub fn set_label(&mut self, label: impl Into<String>) {
+        self.label = Some(label.into());
     }
 
     pub fn on_changed<F>(&self, callback: F)
@@ -134,5 +140,13 @@ impl Widget for Knob {
     fn on_mouse_move(&mut self, event: &PointerEvent) -> EventResponse {
         self.update_from_y(event.position.y);
         EventResponse::Handled
+    }
+
+    fn accessibility(&self) -> AccessibilityNode {
+        let mut node = AccessibilityNode::new(self.id).with_role(Role::Knob);
+        node.label = self.label.clone();
+        let value = self.value.get().get();
+        node.value = Some(format!("{:.2}", value));
+        node
     }
 }

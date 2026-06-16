@@ -12,7 +12,7 @@ use core::fmt;
 /// bytes. Collisions are possible, so it is only recommended for development
 /// convenience. Production code should use explicit, pre-assigned resource IDs
 /// via [`ResourceId::new`].
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Ord, PartialOrd)]
 pub struct ResourceId(u32);
 
 impl ResourceId {

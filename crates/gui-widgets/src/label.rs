@@ -1,8 +1,8 @@
 use core::cell::Cell;
 
 use gui_core::{
-    CommandList, LayoutConstraints, PaintCommand, Pointf, Rectf, Sizef, TextLayoutId, Widget,
-    WidgetId,
+    AccessibilityNode, CommandList, LayoutConstraints, PaintCommand, Pointf, Rectf, Role, Sizef,
+    TextLayoutId, Widget, WidgetId,
 };
 
 use crate::Theme;
@@ -59,5 +59,11 @@ impl Widget for Label {
             ),
             text: TextLayoutId(0),
         });
+    }
+
+    fn accessibility(&self) -> AccessibilityNode {
+        AccessibilityNode::new(self.id)
+            .with_role(Role::Label)
+            .with_label(self.text.clone())
     }
 }

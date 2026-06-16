@@ -30,3 +30,4 @@ gui-accessibility = { path = "crates/gui-accessibility" }
 gui-mac = { path = "crates/gui-mac" }
 gui-test-host = { path = "crates/gui-test-host" }
 gui-widgets = { path = "crates/gui-widgets" }
+gui-win32 = { path = "crates/gui-win32" }

@@ -1,6 +1,7 @@
 use core::any::Any;
 use core::sync::atomic::{AtomicU64, Ordering};
 
+use crate::accessibility::AccessibilityNode;
 use crate::event::{EventResponse, KeyEvent, MouseEvent, PointerEvent};
 use crate::{CommandList, Pointf, Sizef};
 
@@ -41,6 +42,9 @@ pub trait Widget: Any {
     }
     fn on_key_up(&mut self, _event: &KeyEvent) -> EventResponse {
         EventResponse::Bubble
+    }
+    fn accessibility(&self) -> AccessibilityNode {
+        AccessibilityNode::new(self.id())
     }
 }
 

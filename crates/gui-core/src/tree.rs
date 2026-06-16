@@ -3,7 +3,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
-use crate::{Widget, WidgetId};
+use crate::{AccessibilityNode, AccessibilityTree, LayoutResult, Rectf, Widget, WidgetId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TraverseOrder {
@@ -21,6 +21,7 @@ pub struct Node {
 pub struct Tree {
     nodes: BTreeMap<WidgetId, Node>,
     root: Option<WidgetId>,
+    layout: Option<LayoutResult>,
 }
 
 impl Default for Tree {
@@ -34,6 +35,7 @@ impl Tree {
         Self {
             nodes: BTreeMap::new(),
             root: None,
+            layout: None,
         }
     }
 
@@ -91,6 +93,40 @@ impl Tree {
 
     pub fn root(&self) -> Option<WidgetId> {
         self.root
+    }
+
+    pub fn set_layout_result(&mut self, layout: LayoutResult) {
+        self.layout = Some(layout);
+    }
+
+    pub fn accessibility_tree(&self) -> AccessibilityTree {
+        let root_node = match self.root {
+            Some(root_id) => self.build_accessibility_node(root_id),
+            None => AccessibilityNode::new(WidgetId::default()),
+        };
+        AccessibilityTree::new(root_node)
+    }
+
+    fn build_accessibility_node(&self, id: WidgetId) -> AccessibilityNode {
+        let mut node = if let Some(tree_node) = self.nodes.get(&id) {
+            let mut widget_node = tree_node.widget.borrow().accessibility();
+            widget_node.id = id;
+            widget_node
+        } else {
+            AccessibilityNode::new(id)
+        };
+
+        if let Some(layout) = self.layout.as_ref() {
+            if let Some(layout_box) = layout.get(id) {
+                node.bounds = Rectf::new(layout_box.origin, layout_box.size);
+            }
+        }
+
+        for &child_id in self.children_of(id) {
+            node.children.push(self.build_accessibility_node(child_id));
+        }
+
+        node
     }
 
     pub fn children_of(&self, id: WidgetId) -> &[WidgetId] {

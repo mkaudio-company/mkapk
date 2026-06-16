@@ -3,6 +3,7 @@
 
 extern crate alloc;
 
+pub mod accessibility;
 pub mod color;
 pub mod event;
 pub mod geometry;
@@ -13,6 +14,7 @@ pub mod tree;
 pub mod units;
 pub mod widget;
 
+pub use accessibility::{AccessibilityNode, AccessibilityTree, Role, State};
 pub use color::{BLACK, BLUE, Color, GREEN, RED, TRANSPARENT, WHITE};
 pub use event::{
     Event, EventDispatcher, EventResponse, KeyCode, KeyEvent, Modifiers, MouseButton, MouseEvent,

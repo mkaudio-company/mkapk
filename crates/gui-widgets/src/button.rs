@@ -1,8 +1,8 @@
 use core::cell::Cell;
 
 use gui_core::{
-    CommandList, EventResponse, LayoutConstraints, MouseButton, MouseEvent, PaintCommand, Pointf,
-    Rectf, Sizef, TextLayoutId, Widget, WidgetId,
+    AccessibilityNode, CommandList, EventResponse, LayoutConstraints, MouseButton, MouseEvent,
+    PaintCommand, Pointf, Rectf, Role, Sizef, TextLayoutId, Widget, WidgetId,
 };
 
 use crate::Theme;
@@ -101,5 +101,11 @@ impl Widget for Button {
             self.on_click.set(Some(callback));
         }
         EventResponse::Handled
+    }
+
+    fn accessibility(&self) -> AccessibilityNode {
+        AccessibilityNode::new(self.id)
+            .with_role(Role::Button)
+            .with_label(self.label.clone())
     }
 }
