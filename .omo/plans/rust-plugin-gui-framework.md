@@ -664,7 +664,7 @@ Deliver a production-oriented Rust GUI library that can be embedded into VST3, A
 
   **Commit**: YES | Message: `feat(core): add mouse/keyboard event routing` | Files: `crates/gui-core/src/event.rs`
 
-- [ ] 16. Parameter binding API
+- [x] 16. Parameter binding API
 
   **What to do**: In `gui-host`, implement the `ParameterGateway` with lock-free SPSC queues for audio→UI and UI→audio parameter changes. Define `ParameterId`, `NormalizedValue`, `ParameterInfo` (name, default, min, max, step, flags). Widgets call `gateway.begin_gesture(id)`, `set_normalized(id, value)`, `end_gesture(id)` on drag, and receive `on_parameter_changed(id, value)` callbacks. Use `crossbeam` or a custom ring buffer.
 

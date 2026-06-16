@@ -160,3 +160,14 @@
 - Updated `LayoutEngine::measure` to borrow widget references from the `RefCell`.
 - Added 5 unit tests covering deepest-leaf hit-testing, outside-hit bubble, handled-event stop, keyboard dispatch to root, and mouse capture redirection.
 - Verification: `cargo test -p gui-core` passes (36 unit + 2 integration tests), `cargo clippy -p gui-core -- -D warnings` passes, `cargo fmt -p gui-core` applied.
+
+## Task 16: gui-host lock-free parameter gateway
+
+- Extended `crates/gui-host/src/parameter.rs` with `ParameterMessage` and `LockFreeParameterGateway`.
+- Used `crossbeam-channel` bounded channels for both `ui_to_audio` and `audio_to_ui` directions, with a default capacity of 256.
+- Implemented `ParameterGateway` for `LockFreeParameterGateway`; UI-side sends are non-blocking (`try_send`) so the audio thread is never blocked.
+- Added `poll_ui_changes`, `poll_audio_changes`, and `send_from_audio` for queue draining and audio-thread pushes.
+- Cached current values in a `Mutex<BTreeMap<ParameterId, NormalizedValue>>` for `get_normalized` reads.
+- Added `Ord`/`PartialOrd` to `ParameterId` so it can be used as a `BTreeMap` key.
+- Added 4 unit tests covering UI→audio ordering, audio→UI draining, latest value reads, and bounded-channel backpressure (`TrySendError::Full`).
+- Verification: `cargo test -p gui-host` passes (9 tests), `cargo clippy -p gui-host -- -D warnings` passes, `cargo fmt -p gui-host` applied.
