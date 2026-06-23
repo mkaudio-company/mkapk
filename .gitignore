@@ -1,4 +1,25 @@
 /target
+target/
 .omo/evidence/
 .DS_Store
+
+# Editor / IDE
+.idea/
+.vscode/
+*.iml
+
+# Backup / swap files
+*.swp
+*.swo
+*~
+
+# Logs and temp files
+*.log
+*.tmp
+/tmp/
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 

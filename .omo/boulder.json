@@ -74,12 +74,11 @@
       "task_key": "todo:8",
       "task_label": "8",
       "task_title": "Direct2D render backend",
-      "session_id": "opencode:ses_1306472e6ffeCyVVeC8KZPatU6",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
+      "session_id": "opencode:ses_13046869bffeu6MMvNBvxpRUS6",
+      "agent": "general",
       "started_at": "2026-06-15T17:31:32.313Z",
       "status": "running",
-      "updated_at": "2026-06-16T09:15:39.319Z"
+      "updated_at": "2026-06-16T09:23:34.424Z"
     }
   },
   "schema_version": 2,
@@ -89,7 +88,7 @@
       "active_plan": "/Users/minjaekim/Plugins/gui/.omo/plans/rust-plugin-gui-framework.md",
       "plan_name": "rust-plugin-gui-framework",
       "started_at": "2026-06-15T13:49:47Z",
-      "updated_at": "2026-06-16T09:15:39.319Z",
+      "updated_at": "2026-06-16T09:23:34.424Z",
       "session_ids": [
         "opencode:ses_135f513edffeFut1BWMhwIUVU2"
       ],
@@ -162,16 +161,15 @@
           "task_key": "todo:8",
           "task_label": "8",
           "task_title": "Direct2D render backend",
-          "session_id": "opencode:ses_1306472e6ffeCyVVeC8KZPatU6",
-          "agent": "Sisyphus-Junior",
-          "category": "quick",
+          "session_id": "opencode:ses_13046869bffeu6MMvNBvxpRUS6",
+          "agent": "general",
           "started_at": "2026-06-15T17:31:32.313Z",
           "status": "running",
-          "updated_at": "2026-06-16T09:15:39.319Z"
+          "updated_at": "2026-06-16T09:23:34.424Z"
         }
       }
     }
   },
   "active_work_id": "rust-plugin-gui-framework-legacy",
-  "updated_at": "2026-06-16T09:15:39.319Z"
+  "updated_at": "2026-06-16T09:23:34.424Z"
 }

@@ -225,6 +225,16 @@
 - Added unit tests verifying intrinsic size, rendered RGBA byte length/non-zero alpha, and pixmap cache reuse.
 - Verification: `cargo test -p gui-res` passes (8 tests), `cargo clippy -p gui-res -- -D warnings` passes, `cargo fmt -p gui-res` applied.
 
+## Task 26: gui-res PNG renderer
+
+- Created `crates/gui-res/src/png.rs` with `PngImage`, storing decoded width, height, and non-premultiplied RGBA pixels as `alloc::vec::Vec<u8>`.
+- Implemented `Resource` for `PngImage` using `image::load_from_memory` and `DynamicImage::into_rgba8`, limiting the `image` crate to the `png` feature only.
+- Added `width`, `height`, `rgba`, and `rgba_premultiplied` accessors; premultiplication scales each RGB channel by `alpha / 255`.
+- Wired `pub mod png` and re-exported `PngImage` from `crates/gui-res/src/lib.rs`.
+- Added `image = { version = "0.25", default-features = false, features = ["png"] }` to `crates/gui-res/Cargo.toml` while keeping `#![deny(unsafe_code)]`.
+- Added unit tests verifying the embedded 1x1 red `test.png` decodes correctly, cached `Arc` reuse via `ResourceRegistry`, and premultiplied pixel math.
+- Verification: `cargo test -p gui-res` passes, `cargo clippy -p gui-res -- -D warnings` passes, `cargo fmt -p gui-res` applied.
+
 ## Task 32: gui-aax AAX plugin wrapper
 
 - Created `crates/gui-aax/build.rs` that reads `AAX_SDK` at build time. When set, it emits `cfg(aax_sdk)` and links `{AAX_SDK}/Libs`; otherwise it prints a cargo warning and the crate builds as a no-op stub.
@@ -235,3 +245,132 @@
 - Added compile-only `aax_editor_lifecycle` unit test constructing `AaxEditor` with a mock editor.
 - Fixed a pre-existing `gui-core` `#![no_std]` compile issue by importing `alloc::string::ToString` in `crates/gui-core/src/accessibility.rs`.
 - Verification: `cargo test -p gui-aax`, `cargo build -p gui-aax`, `cargo clippy -p gui-aax -- -D warnings`, `cargo run -p gui-aax --example gain -- --test-host --duration-ms 1000`, and `cargo fmt -p gui-aax` all pass.
+
+## Task 33: gui-aax build-only example
+
+- Converted `crates/gui-aax/examples/gain.rs` from a runtime test-host example into a build-only example that links against `AaxEditor`.
+- Removed the macOS `gui-test-host`/`gui-mac` windowing path and the Windows `gui-win32`/`gui-test-host` windowing path.
+- Reused the existing `GainEditor` from the file; its `idle` implementation now rebuilds the paint command list without calling a platform-specific render backend, so the example compiles on macOS and Windows without a DAW.
+- Added a single `run` helper exercised by platform-gated `main` functions:
+  - macOS uses `ParentWindowHandle::Mac(core::ptr::null_mut())`.
+  - Windows uses `ParentWindowHandle::Windows(core::ptr::null_mut())`.
+  - The helper constructs `AaxEditor::new`, calls `create_view`, `view_size`, `timer_wakeup`, `set_parameter(1, 0.5)`, `destroy_view`, and prints `AAX example built successfully`.
+- Kept `#![deny(unsafe_code)]` on the example; raw pointer handles are only stored/constructed, never dereferenced.
+- Removed unused `gui-test-host`, `gui-mac`, and `gui-win32` dev-dependencies from `crates/gui-aax/Cargo.toml`, keeping only `gui-widgets`.
+- Verification: `cargo build -p gui-aax --example gain`, `cargo build -p gui-aax --example gain --features aax`, `cargo clippy -p gui-aax -- -D warnings`, and `cargo fmt -p gui-aax` all pass.
+
+## Task 31: Custom GPU drawing surface
+
+- Added `crates/gui-core/src/widgets/gpu_surface.rs` with `GpuSurface` widget implementing `Widget`, plus `GpuContext` enum (`D3D11`, `Metal`, `Stub`) and raw handle structs `D3D11Context`/`MetalContext` using `*mut c_void` to keep `gui-core` platform-agnostic and `#![deny(unsafe_code)]`.
+- `GpuSurface::on_render` stores a `'static` `FnMut(&mut GpuContext)` callback in a `Cell<Option<Box<dyn FnMut>>>`, matching the pattern used by `gui-widgets` controls.
+- Added `PaintCommand::DrawGpuSurface { rect }` in `crates/gui-core/src/paint.rs` so the widget participates in the command list; the 2D backend can ignore it.
+- Gated the widget/module behind a `gpu-surface` feature in `gui-core`, `gui-win32`, and `gui-mac` so Metal/DirectX are not required for basic widgets.
+- Implemented `crates/gui-win32/src/gpu.rs`: `render_gpu_surface_to_hwnd` creates a D3D11 device, DXGI swap chain, and render target view, sets the viewport, invokes the callback with `GpuContext::D3D11`, and presents. Added `clear_render_target` convenience helper for callbacks.
+- Implemented `crates/gui-mac/src/gpu.rs`: `render_gpu_surface_to_view` configures the `NSView` with a `CAMetalLayer`, creates the default Metal device and command queue, and invokes the callback with `GpuContext::Metal`. Added `clear_to_color` convenience helper that builds a render pass descriptor and commits a clear.
+- Created `crates/gui-test-host/examples/gpu-surface.rs` with a `PluginEditor` that creates a `GpuSurface`, sets a callback clearing to dark blue, and renders each frame. Marked the example as `required-features = ["gpu-surface"]` so `cargo test --workspace` skips it when the feature is off.
+- Added unit tests in `gui-core` for `GpuSurface` construction, `GpuContext` size, and callback invocation, plus compile-only export tests in `gui-mac` and `gui-win32`.
+- Verified on macOS: `cargo build -p gui-test-host --example gpu-surface --features gpu-surface`, `cargo run -p gui-test-host --example gpu-surface --features gpu-surface -- --duration-ms 1000`, `cargo test -p gui-core -p gui-mac -p gui-win32 --features gpu-surface`, `cargo clippy -p gui-core -p gui-mac -p gui-win32 -- -D warnings`, and `cargo test --workspace` all pass.
+- Cross-checked Windows compilation with `cargo check -p gui-win32 --target x86_64-pc-windows-msvc --features gpu-surface` and `cargo clippy -p gui-win32 --target x86_64-pc-windows-msvc --features gpu-surface -- -D warnings`; both pass.
+
+
+## Task 27: gui-core animation system
+
+- Created `crates/gui-core/src/animation.rs` with `AnimationCurve::{Linear, EaseInOut, Spring}` and an `ease(t: f32) -> f32` method.
+- Defined `Animatable` trait with `lerp` and implemented it for `f32`, `Color`, and `Transform`.
+- Defined `Animation<T: Animatable>` with `start`, `stop`, `pause`, `resume`, `restart`, completion callback support, and elapsed/duration tracking.
+- Defined `AnimationController<T: Animatable>` that owns active animations, provides `tick(dt: Duration, on_event)`, and returns `AnimationEvent::Value` / `AnimationEvent::Completed` events via callback.
+- The controller's active list uses `alloc::vec::Vec` and retains capacity across frames; a secondary reusable `removals` Vec tracks indices for `swap_remove`, so no per-frame allocation occurs.
+- Made `Transform` matrix fields and the existing `sin_cos` helper `pub(crate)` so `Transform::lerp` and the spring curve can reuse the no_std math.
+- Added a manual `exp` Taylor-series helper because `f32::exp` is unavailable under `#![no_std]`.
+- Added 10 unit tests covering linear completion, ease-in-out bounds, spring overshoot, cancellation, restart, concurrent independent animations, color/transform interpolation, and pause/resume.
+- Wired `pub mod animation` and re-exported `Animatable`, `Animation`, `AnimationController`, `AnimationCurve`, `AnimationEvent`, `AnimationId`, `AnimationState`, and `AnimationTick` from `crates/gui-core/src/lib.rs`.
+- Verification: `cargo test -p gui-core animation` passes (10 tests), `cargo test -p gui-core` passes (50 unit + 2 integration tests), `cargo clippy -p gui-core -- -D warnings` passes.
+
+## Task 8: gui-win32 Direct2D render backend
+
+- Added `crates/gui-win32/src/render.rs` with `D2DRenderBackend` implementing `gui_core::RenderBackend`.
+- Created a Direct2D factory (`D2D1CreateFactory`), a D3D11 device, a DXGI swap chain bound to the HWND, and a device context render target from the swap-chain back buffer (`CreateBitmapFromDxgiSurface`).
+- Implemented `Clear`, `FillRect`, `StrokeRect`, `FillRoundedRect`, `StrokeRoundedRect`, `FillPath`, `StrokePath`, and `LinearGradient`; left `DrawImage`/`DrawText` as no-ops for v0.1.
+- Direct2D uses a top-left origin, so no Y-axis flip is required (unlike the CoreGraphics backend).
+- `Color::to_premultiplied_f32()` feeds D2D color/gradient stops directly.
+- Per-frame transient data (path points, gradient stops) is kept in reusable `Vec` buffers cleared each command.
+- `render_to_hwnd` constructs the backend each frame, resizes the swap chain in `begin()` when the logical size changed, and presents with `Present(1, DXGI_PRESENT(0))`.
+- Added `windows-numerics` for `Vector2` used by `ID2D1GeometrySink::AddLines`/`BeginFigure` and `D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES`.
+- Added the requested `windows` crate Direct2D/DXGI/DirectComposition/Imaging features.
+- Added a non-Windows stub so `cargo build -p gui-win32` succeeds on macOS.
+- Added `d2d-rect` example in `crates/gui-test-host/examples/` mirroring `cg-rect.rs`, gated with `#[cfg(target_os = "windows")]`.
+- Added compile-only `d2d_render_backend_exports` unit test.
+- Verification: `cargo build -p gui-win32`, `cargo test -p gui-win32`, `cargo clippy -p gui-win32 -- -D warnings`, and `cargo build -p gui-test-host --example d2d-rect` succeed on macOS; runtime test awaits Windows.
+
+## Task 12: gui-vst3 blank test-host example
+
+- Created `crates/gui-vst3/examples/gain.rs` implementing a minimal `GainEditor` that runs inside `gui-test-host` without a DAW.
+- Added `gui-test-host`, `gui-mac` (macOS), `gui-win32` (Windows), `gui-widgets`, and `gui-host` as dev-dependencies in `crates/gui-vst3/Cargo.toml`, using target-specific dev-dependencies for the platform crates.
+- `GainEditor` owns a `Tree` with a root `Panel`, a `Label`, and a `Slider` bound to `ParameterId(1)`, plus a shared `Arc<LockFreeParameterGateway>`.
+- The slider's `on_changed` callback forwards normalized values through the gateway and prints the value in dB.
+- Layout is computed in `new` and recomputed on `resize`; frames are applied to concrete widget types via `gui_core::downcast_widget_ref`.
+- `idle` rebuilds paint commands from the tree and renders via `gui_mac::render_to_view` on macOS or `gui_win32::render_to_hwnd` on Windows.
+- `main()` parses `--duration-ms`, `--width`, and `--height` and delegates to `gui_test_host::run_test_host_with_editor`.
+- Added a `#[cfg(test)]` unit test in the example that wires a `Slider` callback to a shared `Vec`, dispatches a mouse-down event through `EventDispatcher`, and asserts the callback receives a normalized value between 0.4 and 0.6.
+- Kept the example `#![deny(unsafe_code)]`; raw pointer handles are stored but never dereferenced.
+- Fixed a pre-existing resolver error in `crates/gui-win32/Cargo.toml` by removing the non-existent `Win32_Graphics_DirectWrite` and `Win32_Graphics_DirectWrite_Common` `windows` crate features (DirectWrite is unused in the D2D backend).
+- Verification: `cargo build -p gui-vst3 --example gain`, `cargo run -p gui-vst3 --example gain -- --test-host --duration-ms 1000` (prints `EditorAttached`/`EditorDetached`), `cargo test -p gui-vst3 --example gain` (1 passed), `cargo clippy -p gui-vst3 -- -D warnings`, and `cargo clippy -p gui-win32 -- -D warnings` all pass.
+
+## Task 9: gui-win32 DirectWrite text rendering
+
+- Added `crates/gui-win32/src/text.rs` with `TextLayout` backed by `IDWriteTextFormat`/`IDWriteTextLayout`, a `TextCache` keyed by `(text_hash, font_size_bits, font_key)`, and `draw_text_to_hwnd`.
+- `TextLayout::new` uses the system font collection (Segoe UI -> Arial -> Microsoft Sans Serif -> Tahoma -> first family fallback).
+- `TextLayout::with_font` loads embedded font bytes via `IDWriteFactory5::CreateInMemoryFontFileLoader`, builds a font set, creates a custom collection, and unregisters the loader on drop so custom font resources are released.
+- Metrics come from `IDWriteTextLayout::GetMetrics` (width/height) and `GetLineMetrics` (baseline).
+- `TextLayout::draw` sets the D2D solid brush to white and renders via `ID2D1RenderTarget::DrawTextLayout`.
+- Added non-Windows stubs so `cargo build -p gui-win32` succeeds on macOS.
+- Created `crates/gui-test-host/examples/d2d-text.rs` rendering "Hello DirectWrite" via `gui_win32::draw_text_to_hwnd` on Windows and printing on macOS.
+- While wiring this up, fixed pre-existing `gui-win32`/`gui-test-host` Windows compile issues against `windows` crate 0.62.2:
+  - `HWND`/`HMENU`/`HINSTANCE` handles now require `Some(...)` in many API calls.
+  - `windows_numerics::Vector2` fields are uppercase `X`/`Y`.
+  - `DXGI_SWAP_CHAIN_DESC1` has a required `Stereo` field.
+  - `D3D_DRIVER_TYPE_*` lives under `Win32_Graphics_Direct3D`, not `Win32_Graphics_Direct3D11`.
+  - `ID2D1DeviceContext` shadows `CreateGradientStopCollection` with a newer overload; call the `ID2D1RenderTarget` overload explicitly.
+  - `CreatePathGeometry` is on `ID2D1Factory1`, not the device context.
+- Verification: `cargo build -p gui-win32`, `cargo test -p gui-win32`, `cargo clippy -p gui-win32 -- -D warnings`, and `cargo build -p gui-test-host --example d2d-text` pass on macOS. Cross-checked the Windows code path with `cargo check -p gui-win32 --target x86_64-pc-windows-msvc` and `cargo clippy -p gui-win32 --target x86_64-pc-windows-msvc -- -D warnings`.
+
+## Task 29: gui-vst3 animated example plugin
+
+- Extended `crates/gui-vst3/examples/gain.rs` with a looping peak-meter animation and embedded SVG/PNG assets.
+- Added `crates/gui-res/resources/knob.svg` (64x64 gray circle with white tick) and `crates/gui-res/resources/logo.png` (32x32 blue square). `crates/gui-res/build.rs` auto-registered both in `src/generated.rs` via `ResourceId::from_bytes_le`.
+- `GainEditor` now owns an `AnimationController<f32>` driving a 1.5-second oscillation: 0.0→1.0 over 750 ms, then 1.0→0.0 over 750 ms, using `AnimationCurve::EaseInOut`. On `AnimationEvent::Completed`, the direction flips and a new animation is started.
+- Each `idle()` measures elapsed wall-clock time, advances the controller, and rebuilds the paint command list to reflect the animated peak-meter bar height.
+- Resources are loaded once in `GainEditor::new()` through a `ResourceRegistry` registered with `gui_res::generated::EMBEDDED`; the resulting `ResourceHandle<SvgImage>` and `ResourceHandle<PngImage>` are stored in the editor.
+- Drawing uses placeholder `PaintCommand::DrawImage` rectangles sized to the resources' intrinsic dimensions; the actual render backends still leave `DrawImage` as a no-op in v0.1.
+- To avoid per-frame allocation, `GainEditor` keeps a `CommandList` with pre-allocated capacity (32) and calls `clear()` each frame; `AnimationController`'s internal `Vec`s retain capacity across ticks.
+- Added two unit tests in the example: one verifying the animation value advances across two simulated frames, and one verifying `rebuild_commands()` does not change `CommandList` capacity between frames.
+- Added `gui-res` as a dev-dependency in `crates/gui-vst3/Cargo.toml`.
+- Verification: `cargo run -p gui-vst3 --example gain -- --test-host --duration-ms 3000` prints `EditorAttached`/`EditorDetached`, `cargo test -p gui-vst3 --example gain` passes (3 tests), `cargo clippy -p gui-vst3 -- -D warnings` passes, `cargo test -p gui-res` passes (11 tests), and `cargo clippy -p gui-res -- -D warnings` passes.
+
+## Task 31: custom GPU drawing surface
+
+- Added `crates/gui-core/src/widgets/gpu_surface.rs` with `GpuSurface` widget, `GpuContext` enum (`D3D11`/`Metal`/`Stub`), and `D3D11Context`/`MetalContext` raw handle structs.
+- Gated `pub mod widgets` and the `GpuSurface` re-exports behind a `gpu-surface` feature in `gui-core/Cargo.toml`.
+- Added `crates/gui-win32/src/gpu.rs` with `render_gpu_surface_to_hwnd` creating a D3D11 device/swap chain/render target view and invoking a callback with `GpuContext::D3D1`; includes `clear_render_target` helper.
+- Added `crates/gui-mac/src/gpu.rs` with `render_gpu_surface_to_view` configuring a `CAMetalLayer`, default Metal device, command queue, and invoking a callback with `GpuContext::Metal`; includes `clear_to_color` helper.
+- Added `crates/gui-test-host/examples/gpu-surface.rs` clearing the surface to dark blue each frame, with `required-features = ["gpu-surface"]`.
+- Verification: `cargo build -p gui-test-host --example gpu-surface --features gpu-surface`, `cargo run -p gui-test-host --example gpu-surface --features gpu-surface -- --duration-ms 1000`, and `cargo test -p gui-core -p gui-mac -p gui-win32 --features gpu-surface` all pass.
+
+## Task 34: end-to-end cross-platform validation
+
+- Updated `xtask/src/main.rs` so `cargo xtask validate` runs `cargo test --workspace` and `cargo clippy --workspace -- -D warnings`, printing PASS/FAIL for each.
+- Generated `.omo/evidence/validation-report.md` summarizing the validation matrix.
+- `cargo xtask validate` exits 0 on macOS.
+- Runnable checks on macOS (workspace tests/clippy, test-host examples, VST3/AU test-host examples, GPU surface example) all pass.
+
+## Documentation follow-up
+
+- Created `/Users/minjaekim/Plugins/gui/README.md` with project overview, feature matrix, crate listing, quick-start commands, architecture notes, platform support matrix, development commands, CI summary, and license placeholder.
+- Updated `/Users/minjaekim/Plugins/gui/.gitignore` with standard Rust/project entries (target/, IDE directories, swap/backup files, logs, OS files) while keeping existing entries and retaining `Cargo.lock`.
+- Added `description`, `repository`, and `documentation` fields to root `Cargo.toml` under `[workspace.package]`.
+- Added concise `//!` crate-level doc comments to all 12 crate roots (`gui-core`, `gui-host`, `gui-res`, `gui-accessibility`, `gui-win32`, `gui-mac`, `gui-vst3`, `gui-au`, `gui-aax`, `gui-test-host`, `gui-widgets`, `xtask`).
+- Verified `cargo doc --workspace --no-deps` builds successfully and generates docs for all crates.
+- Note: subagent tasks timed out repeatedly on this documentation-only work, so the changes were applied directly after delegation failures.
+- Windows-specific runtime checks (Direct2D examples, VST3 validator), AAX SDK build, `auval`, and Miri are marked SKIP in the report with environment-specific reasons.
+
+

@@ -2,7 +2,7 @@ use crate::geometry::Point;
 
 const TWO_PI: f32 = 2.0 * core::f32::consts::PI;
 
-fn sin_cos(x: f32) -> (f32, f32) {
+pub(crate) fn sin_cos(x: f32) -> (f32, f32) {
     let mut theta = x % TWO_PI;
     if theta < 0.0 {
         theta += TWO_PI;
@@ -36,12 +36,12 @@ fn sin_cos(x: f32) -> (f32, f32) {
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Transform {
-    m11: f32,
-    m12: f32,
-    m21: f32,
-    m22: f32,
-    m31: f32,
-    m32: f32,
+    pub(crate) m11: f32,
+    pub(crate) m12: f32,
+    pub(crate) m21: f32,
+    pub(crate) m22: f32,
+    pub(crate) m31: f32,
+    pub(crate) m32: f32,
 }
 
 impl Transform {

@@ -15,11 +15,4 @@ gui-core = { workspace = true }
 gui-host = { workspace = true }
 
 [dev-dependencies]
-gui-test-host = { workspace = true }
 gui-widgets = { workspace = true }
-
-[target.'cfg(target_os = "macos")'.dev-dependencies]
-gui-mac = { workspace = true }
-
-[target.'cfg(target_os = "windows")'.dev-dependencies]
-gui-win32 = { workspace = true }

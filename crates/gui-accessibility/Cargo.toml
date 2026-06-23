@@ -8,3 +8,14 @@ license.workspace = true
 
 [dependencies]
 gui-core = { workspace = true }
+
+[features]
+default = []
+backend = []
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+gui-test-host = { workspace = true }
+gui-mac = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dev-dependencies]
+gui-win32 = { workspace = true }

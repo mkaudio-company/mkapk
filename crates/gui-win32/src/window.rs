@@ -16,6 +16,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 #[cfg(target_os = "windows")]
 struct EditorWindowState {
     editor: Box<dyn PluginEditor>,
+    #[allow(dead_code)]
     host: Box<dyn EditorHost>,
     size: gui_core::Sizef,
 }
@@ -84,11 +85,12 @@ impl Win32Window {
                 0,
                 width as i32,
                 height as i32,
-                parent_hwnd,
-                HMENU(null_mut()),
-                HINSTANCE(hinstance.0),
+                Some(parent_hwnd),
+                Some(HMENU(null_mut())),
+                Some(HINSTANCE(hinstance.0)),
                 None,
             )
+            .ok()?
         };
 
         if hwnd.0.is_null() {
@@ -106,7 +108,7 @@ impl Win32Window {
 
     pub fn request_repaint(&self) {
         unsafe {
-            let _ = InvalidateRect(self.hwnd, None, false);
+            let _ = InvalidateRect(Some(self.hwnd), None, false);
             let _ = UpdateWindow(self.hwnd);
         }
     }
@@ -114,7 +116,7 @@ impl Win32Window {
     pub fn client_size(&self) -> gui_core::Sizef {
         unsafe {
             let mut rect = RECT::default();
-            if GetClientRect(self.hwnd, &mut rect).as_bool() {
+            if GetClientRect(self.hwnd, &mut rect).is_ok() {
                 gui_core::Sizef::new(
                     (rect.right - rect.left) as f32,
                     (rect.bottom - rect.top) as f32,
@@ -168,14 +170,14 @@ unsafe extern "system" fn wnd_proc(
             let state = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut EditorWindowState;
             if !state.is_null() {
                 let mut rect = RECT::default();
-                if GetClientRect(hwnd, &mut rect).as_bool() {
+                if GetClientRect(hwnd, &mut rect).is_ok() {
                     let size = gui_core::Sizef::new(
                         (rect.right - rect.left) as f32,
                         (rect.bottom - rect.top) as f32,
                     );
                     (*state).size = size;
                     (*state).editor.resize(size);
-                    let _ = InvalidateRect(hwnd, None, false);
+                    let _ = InvalidateRect(Some(hwnd), None, false);
                     let _ = UpdateWindow(hwnd);
                 }
             }
@@ -184,13 +186,13 @@ unsafe extern "system" fn wnd_proc(
         WM_DPICHANGED => {
             let state = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut EditorWindowState;
             if !state.is_null() {
-                let _ = InvalidateRect(hwnd, None, false);
+                let _ = InvalidateRect(Some(hwnd), None, false);
                 let _ = UpdateWindow(hwnd);
             }
             LRESULT(0)
         }
         WM_PAINT => {
-            let _ = ValidateRect(hwnd, None);
+            let _ = ValidateRect(Some(hwnd), None);
             LRESULT(0)
         }
         WM_DESTROY => {
@@ -202,20 +204,20 @@ unsafe extern "system" fn wnd_proc(
             LRESULT(0)
         }
         WM_LBUTTONDOWN => {
-            let x = GET_X_LPARAM(lparam);
-            let y = GET_Y_LPARAM(lparam);
+            let x = (lparam.0 as i32) & 0xFFFF;
+            let y = ((lparam.0 >> 16) as i32) & 0xFFFF;
             println!("mouse_down x={} y={}", x, y);
             LRESULT(0)
         }
         WM_LBUTTONUP => {
-            let x = GET_X_LPARAM(lparam);
-            let y = GET_Y_LPARAM(lparam);
+            let x = (lparam.0 as i32) & 0xFFFF;
+            let y = ((lparam.0 >> 16) as i32) & 0xFFFF;
             println!("mouse_up x={} y={}", x, y);
             LRESULT(0)
         }
         WM_MOUSEMOVE => {
-            let x = GET_X_LPARAM(lparam);
-            let y = GET_Y_LPARAM(lparam);
+            let x = (lparam.0 as i32) & 0xFFFF;
+            let y = ((lparam.0 >> 16) as i32) & 0xFFFF;
             println!("mouse_move x={} y={}", x, y);
             LRESULT(0)
         }

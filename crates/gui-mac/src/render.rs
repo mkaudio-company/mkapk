@@ -147,6 +147,7 @@ impl CoreGraphicsRenderBackend {
             }
             PaintCommand::DrawImage { .. } => {}
             PaintCommand::DrawText { .. } => {}
+            PaintCommand::DrawGpuSurface { .. } => {}
         }
     }
 }

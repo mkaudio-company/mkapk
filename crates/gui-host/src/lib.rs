@@ -1,3 +1,5 @@
+//! Host abstraction traits for plugin editors and a lock-free parameter gateway
+//! between the UI and audio threads.
 #![deny(unsafe_code)]
 
 pub mod editor;

@@ -1,3 +1,5 @@
+//! Audio Unit plugin format wrapper providing a Cocoa UI view around
+//! `gui-host::PluginEditor`.
 #![allow(unexpected_cfgs)]
 
 #[cfg(all(feature = "au", target_os = "macos"))]

@@ -62,6 +62,13 @@ pub enum PaintCommand {
         position: Pointf,
         text: TextLayoutId,
     },
+    /// Raw GPU surface region for the platform GPU helper.
+    ///
+    /// The 2D backend should ignore this command; the platform helper renders
+    /// the surface after the 2D pass.
+    DrawGpuSurface {
+        rect: Rectf,
+    },
 }
 
 pub struct CommandList {

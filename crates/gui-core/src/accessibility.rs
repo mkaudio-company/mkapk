@@ -208,8 +208,8 @@ mod tests {
     use alloc::string::ToString;
 
     use crate::{
-        AccessibilityNode, LayoutConstraints, LayoutEngine, LayoutNode, Pointf, Rectf, Role,
-        Sizef, State, Tree, Widget, WidgetId,
+        AccessibilityNode, LayoutConstraints, LayoutEngine, LayoutNode, Pointf, Rectf, Role, Sizef,
+        State, Tree, Widget, WidgetId,
     };
 
     struct Panel {

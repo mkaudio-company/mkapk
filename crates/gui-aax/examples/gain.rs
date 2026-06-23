@@ -188,8 +188,7 @@ impl PluginEditor for GainEditor {
     }
 
     fn idle(&mut self) {
-        let commands = self.rebuild_commands();
-        let _ = gui_mac::render_to_view(self.view, self.size, 1.0, &commands);
+        let _commands = self.rebuild_commands();
     }
 
     fn close(&mut self) {}
@@ -201,49 +200,29 @@ impl PluginEditor for GainEditor {
     }
 }
 
-#[cfg(target_os = "windows")]
-struct AaxTestHost;
-
-#[cfg(target_os = "windows")]
-impl EditorHost for AaxTestHost {
-    fn request_resize(&self, _size: Sizef) {}
-    fn start_parameter_gesture(&self, _id: ParameterId) {}
-    fn end_parameter_gesture(&self, _id: ParameterId) {}
-    fn set_parameter_normalized(&self, _id: ParameterId, _value: NormalizedValue) {}
-}
-
 #[cfg(target_os = "macos")]
 fn main() {
-    gui_test_host::run_test_host_with_editor(1000, 400, 300, GainEditor::new());
+    run(ParentWindowHandle::Mac(core::ptr::null_mut()));
 }
 
 #[cfg(target_os = "windows")]
 fn main() {
-    use std::time::{Duration, Instant};
-
-    let (window, parent) = gui_test_host::create_host_window(400, 300);
-    let host = AaxTestHost;
-    let editor = Box::new(GainEditor::new());
-
-    match gui_win32::Win32Window::create(parent, 400, 300, editor, Box::new(host)) {
-        Some(_child) => {
-            let start = Instant::now();
-            let duration = Duration::from_millis(1000);
-            while start.elapsed() < duration {
-                if !window.pump_events() {
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(16));
-            }
-            window.destroy();
-        }
-        None => {
-            println!("AAX stub on Windows");
-        }
-    }
+    run(ParentWindowHandle::Windows(core::ptr::null_mut()));
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn main() {
     println!("This example is only supported on macOS and Windows.");
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn run(parent: ParentWindowHandle) {
+    let editor = GainEditor::new();
+    let mut aax_editor = gui_aax::AaxEditor::new(Box::new(editor));
+    aax_editor.create_view(parent).unwrap();
+    let _ = aax_editor.view_size();
+    aax_editor.timer_wakeup();
+    aax_editor.set_parameter(1, 0.5);
+    aax_editor.destroy_view();
+    println!("AAX example built successfully");
 }

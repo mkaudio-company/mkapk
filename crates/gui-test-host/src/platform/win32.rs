@@ -1,16 +1,16 @@
+#![allow(unsafe_op_in_unsafe_fn)]
+
 use core::ffi::c_void;
 use std::ptr::null_mut;
 
 use gui_host::ParentWindowHandle;
-use windows::Win32::Foundation::{
-    HBRUSH, HCURSOR, HICON, HINSTANCE, HMENU, HWND, LPARAM, LRESULT, WPARAM,
-};
-use windows::Win32::Graphics::Gdi::{GetStockObject, WHITE_BRUSH};
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Graphics::Gdi::{GetStockObject, HBRUSH, WHITE_BRUSH};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
     AdjustWindowRectEx, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    DispatchMessageW, MSG, PM_REMOVE, PeekMessageW, RegisterClassExW, TranslateMessage,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WM_QUIT, WNDCLASS_STYLES, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
+    DispatchMessageW, HCURSOR, HICON, HMENU, MSG, PM_REMOVE, PeekMessageW, RegisterClassExW,
+    TranslateMessage, WINDOW_EX_STYLE, WM_QUIT, WNDCLASS_STYLES, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
 };
 use windows::core::PCWSTR;
 
@@ -63,9 +63,9 @@ pub fn create_host_window(width: u32, height: u32) -> (PlatformWindow, ParentWin
             CW_USEDEFAULT,
             rect.right - rect.left,
             rect.bottom - rect.top,
-            HWND(null_mut()),
-            HMENU(null_mut()),
-            hinstance,
+            Some(HWND(null_mut())),
+            Some(HMENU(null_mut())),
+            Some(hinstance),
             None,
         )
         .expect("CreateWindowExW failed");
@@ -85,7 +85,7 @@ impl PlatformWindow {
     pub fn pump_events(&self) -> bool {
         unsafe {
             let mut msg = MSG::default();
-            while PeekMessageW(&mut msg, HWND(null_mut()), 0, 0, PM_REMOVE).as_bool() {
+            while PeekMessageW(&mut msg, Some(HWND(null_mut())), 0, 0, PM_REMOVE).as_bool() {
                 if msg.message == WM_QUIT {
                     return false;
                 }

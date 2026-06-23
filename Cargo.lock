@@ -464,10 +464,7 @@ version = "0.1.0"
 dependencies = [
  "gui-core",
  "gui-host",
- "gui-mac",
- "gui-test-host",
  "gui-widgets",
- "gui-win32",
 ]
 
 [[package]]
@@ -475,6 +472,9 @@ name = "gui-accessibility"
 version = "0.1.0"
 dependencies = [
  "gui-core",
+ "gui-mac",
+ "gui-test-host",
+ "gui-win32",
 ]
 
 [[package]]
@@ -525,6 +525,7 @@ name = "gui-res"
 version = "0.1.0"
 dependencies = [
  "gui-core",
+ "image",
  "resvg",
  "tiny-skia",
  "usvg",
@@ -536,10 +537,12 @@ version = "0.1.0"
 dependencies = [
  "cocoa",
  "core-graphics",
+ "gui-accessibility",
  "gui-core",
  "gui-host",
  "gui-mac",
  "gui-widgets",
+ "gui-win32",
  "objc",
  "windows",
 ]
@@ -550,6 +553,11 @@ version = "0.1.0"
 dependencies = [
  "gui-core",
  "gui-host",
+ "gui-mac",
+ "gui-res",
+ "gui-test-host",
+ "gui-widgets",
+ "gui-win32",
  "vst3-sys",
 ]
 
@@ -568,6 +576,7 @@ dependencies = [
  "gui-core",
  "gui-host",
  "windows",
+ "windows-numerics",
 ]
 
 [[package]]
@@ -586,6 +595,19 @@ name = "hermit-abi"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc0fef456e4baa96da950455cd02c081ca953b141298e41db3fc7e36b1da849c"
+
+[[package]]
+name = "image"
+version = "0.25.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6506c6c10786659413faa717ceebcb8f70731c0a60cbae39795fdf114519c1a"
+dependencies = [
+ "bytemuck",
+ "byteorder-lite",
+ "moxcms",
+ "num-traits",
+ "png",
+]
 
 [[package]]
 name = "image-webp"
@@ -705,6 +727,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "moxcms"
+version = "0.7.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac9557c559cd6fc9867e122e20d2cbefc9ca29d80d027a8e39310920ed2f0a97"
+dependencies = [
+ "num-traits",
+ "pxfm",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -804,6 +836,12 @@ checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "pxfm"
+version = "0.1.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0c5ccf5294c6ccd63a74f1565028353830a9c2f5eb0c682c355c471726a6e3f"
 
 [[package]]
 name = "quick-error"

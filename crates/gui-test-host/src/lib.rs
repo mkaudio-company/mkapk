@@ -1,3 +1,5 @@
+//! DAW-less standalone test host for exercising plugin editors outside a real
+//! DAW.
 #![allow(unexpected_cfgs, deprecated)]
 
 #[cfg(target_os = "macos")]

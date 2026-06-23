@@ -18,7 +18,11 @@ path = "src/main.rs"
 gui-core = { workspace = true }
 gui-host = { workspace = true }
 gui-mac = { workspace = true }
+gui-win32 = { workspace = true }
 gui-widgets = { workspace = true }
+
+[dev-dependencies]
+gui-accessibility = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62.2", default-features = false, features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_Graphics_Gdi"] }
@@ -27,3 +31,10 @@ windows = { version = "0.62.2", default-features = false, features = ["Win32_Fou
 cocoa = "0.26.1"
 objc = "0.2.7"
 core-graphics = "0.24.0"
+
+[features]
+gpu-surface = ["gui-core/gpu-surface", "gui-mac/gpu-surface", "gui-win32/gpu-surface"]
+
+[[example]]
+name = "gpu-surface"
+required-features = ["gpu-surface"]

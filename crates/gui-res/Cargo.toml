@@ -8,6 +8,7 @@ license.workspace = true
 
 [dependencies]
 gui-core = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png"] }
 resvg = "0.47"
 usvg = "0.47"
 tiny-skia = "0.12"

@@ -1,3 +1,4 @@
+//! Built-in widget library: Slider, Knob, Button, Label, and default theme.
 #![deny(unsafe_code)]
 
 pub mod button;

@@ -1,3 +1,4 @@
+//! AAX plugin format wrapper (build-only without the Avid AAX SDK).
 #![cfg_attr(not(aax_sdk), deny(unsafe_code))]
 
 use gui_core::Sizef;
