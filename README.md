@@ -134,7 +134,7 @@ AAX builds are gated by the `aax` feature and the `AAX_SDK_PATH` environment var
 
 ## License
 
-This project is licensed under the MIT OR Apache-2.0 license. See `LICENSE-MIT` and `LICENSE-APACHE` (to be added).
+This project is licensed under the MIT OR Apache-2.0 license. See `LICENSE-MIT` and `LICENSE-APACHE`.
 
 ## Acknowledgments
 
