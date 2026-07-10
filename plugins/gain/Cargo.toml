@@ -8,18 +8,24 @@ license.workspace = true
 
 [lib]
 name = "gain_plugin"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [[bin]]
 name = "gain-standalone"
 path = "src/bin/standalone.rs"
 required-features = ["standalone"]
 
+[[bin]]
+name = "gain-aax-page-table"
+path = "src/bin/aax_page_table.rs"
+required-features = ["aax"]
+
 [features]
 default = []
 standalone = ["dep:gui-standalone"]
 vst3 = ["dep:gui-vst3"]
 au = ["dep:gui-au"]
+aax = ["dep:gui-aax"]
 
 [dependencies]
 gui-core = { workspace = true }
@@ -29,6 +35,7 @@ gui-widgets = { workspace = true }
 gui-standalone = { workspace = true, optional = true }
 gui-vst3 = { workspace = true, optional = true }
 gui-au = { workspace = true, optional = true }
+gui-aax = { workspace = true, optional = true, features = ["aax"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 gui-mac = { workspace = true }

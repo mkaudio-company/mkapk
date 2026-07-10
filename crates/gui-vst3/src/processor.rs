@@ -18,7 +18,8 @@ use vst3_sys::base::{
 use vst3_sys::utils::SharedVstPtr;
 use vst3_sys::vst::{
     BusDirection, BusInfo, IAudioProcessor, IComponent, IParamValueQueue, IParameterChanges,
-    IoMode, K_SAMPLE32, MediaType, ProcessData, ProcessSetup, RoutingInfo, SpeakerArrangement,
+    IProcessContextRequirements, IoMode, K_SAMPLE32, MediaType, ProcessData, ProcessSetup,
+    RoutingInfo, SpeakerArrangement,
 };
 
 use crate::util::wstrcpy;
@@ -49,7 +50,12 @@ fn count_channels(arr: SpeakerArrangement) -> i32 {
 
 /// Real `IComponent` + `IAudioProcessor` bridging a boxed
 /// `gui_host::Processor` into VST3's audio-processing contract.
-#[VST3(implements(IComponent, IAudioProcessor))]
+/// `IProcessContextRequirements` has been mandatory since VST SDK 3.7;
+/// confirmed via the real Steinberg validator (`validator.exe`/`validator`,
+/// built from `vst3sdk`'s own CMake project), which otherwise fails a
+/// component with "Missing mandatory IProcessContextRequirements
+/// extension!" even though every other test passes.
+#[VST3(implements(IComponent, IAudioProcessor, IProcessContextRequirements))]
 pub struct VstAudioProcessor {
     processor: RefCell<Box<dyn Processor>>,
     controller_cid: GUID,
@@ -385,6 +391,16 @@ impl IAudioProcessor for VstAudioProcessor {
     }
 
     unsafe fn get_tail_samples(&self) -> u32 {
+        0
+    }
+}
+
+impl IProcessContextRequirements for VstAudioProcessor {
+    /// This crate's `Processor::process` never reads tempo, transport
+    /// state, or any other `ProcessContext` field (it's given plain sample
+    /// buffers only), so it needs none of the optional context data a host
+    /// could otherwise spend time computing/passing per block.
+    unsafe fn get_process_context_requirements(&self) -> u32 {
         0
     }
 }

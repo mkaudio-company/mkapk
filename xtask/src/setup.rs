@@ -3,15 +3,16 @@
 use std::io::{self, IsTerminal, Write};
 use std::process::Command;
 
-/// Reads `PLUGIN_NAME`, prompting interactively (default "Gain") if unset and
-/// stdin is a terminal.
-pub fn resolve_plugin_name() -> String {
+/// Reads `PLUGIN_NAME`, prompting interactively (default `default_name`,
+/// e.g. the titlecased slug of whichever `plugins/<slug>` crate is being
+/// bundled -- see `PluginTarget`) if unset and stdin is a terminal.
+pub fn resolve_plugin_name(default_name: &str) -> String {
     if let Ok(name) = std::env::var("PLUGIN_NAME") {
         if !name.trim().is_empty() {
             return name.trim().to_string();
         }
     }
-    prompt_with_default("Plugin name", "Gain")
+    prompt_with_default("Plugin name", default_name)
 }
 
 /// Reads `PLUGIN_COMPANY`, prompting interactively (default "mkaudio") if

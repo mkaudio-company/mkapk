@@ -692,6 +692,7 @@ dependencies = [
 name = "gain-plugin"
 version = "0.1.0"
 dependencies = [
+ "gui-aax",
  "gui-au",
  "gui-core",
  "gui-host",

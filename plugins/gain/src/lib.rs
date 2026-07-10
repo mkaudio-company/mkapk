@@ -68,3 +68,20 @@ gui_au::au_entry! {
     },
     factory_function: gain_au_factory,
 }
+
+// AAX's own "Describe"/parameter-registration code (`gui-aax/cpp/`) is a
+// generic C++ layer built by the Avid AAX SDK's own CMake tooling -- it
+// reads this plugin's identity and parameter list entirely through the
+// extern "C" functions this macro generates, so nothing Gain-specific lives
+// in C++ at all. See `gui-aax::component`'s doc comment for the full
+// picture.
+#[cfg(all(feature = "aax", aax_sdk))]
+gui_aax::aax_entry! {
+    processor: processor::GainProcessor::new,
+    manufacturer_id: gui_aax::fourcc(*b"Mkau"),
+    product_id: gui_aax::fourcc(*b"Gain"),
+    plugin_id_native: gui_aax::fourcc(*b"GnNa"),
+    effect_id: "com.mkaudio.aax.gain",
+    name: "Gain",
+    manufacturer_name: "mkaudio",
+}

@@ -4,6 +4,8 @@ use std::process::{Command, ExitCode};
 
 mod aax;
 mod bundle;
+mod new_plugin;
+mod plugin_target;
 mod setup;
 
 fn main() -> ExitCode {
@@ -22,6 +24,7 @@ fn main() -> ExitCode {
         "bundle-aax" => aax::bundle_aax(),
         "bundle-all" => run_bundle_all(),
         "validate" => run_validate(),
+        "new-plugin" => new_plugin::new_plugin(&args[2..]),
         other => {
             eprintln!("Unknown command: {}", other);
             ExitCode::from(1)

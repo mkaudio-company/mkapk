@@ -39,3 +39,4 @@ gui-win32 = { path = "crates/gui-win32", version = "0.1.0" }
 gui-standalone = { path = "crates/gui-standalone", version = "0.1.0" }
 gui-vst3 = { path = "crates/gui-vst3", version = "0.1.0" }
 gui-au = { path = "crates/gui-au", version = "0.1.0" }
+gui-aax = { path = "crates/gui-aax", version = "0.1.0" }

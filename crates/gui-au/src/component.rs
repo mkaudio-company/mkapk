@@ -16,19 +16,35 @@
 //! `editor.rs`'s `AUCocoaUIBase` factory class).
 //!
 //! Not implemented (spec-legal to omit; hosts fall back to defaults/ignore):
-//! property-change listeners, factory presets, class-info (session state)
-//! persistence, MIDI.
+//! factory presets, class-info (session state) persistence, MIDI.
 //!
-//! **Verification ceiling**: this compiles, type-checks, and its logic has
-//! been reviewed carefully against the AudioToolbox headers `au-sys` is
-//! transcribed from, but there is no AU host or `auval`-equivalent
-//! validator available in this environment, so it has not been run against
-//! a real host. Treat it the same as `gui-vst3`'s real entry point was
-//! before first real-host testing.
+//! **Verified against Apple's real `auval`** (not just reviewed against
+//! headers): several real bugs were found and fixed this way that would
+//! not have been caught otherwise --
+//! - the manufacturer four-character code needs at least one non-lowercase
+//!   letter, or the Component Manager rejects it outright;
+//! - `Info.plist`'s `AudioComponents.version` must be a plist `<integer>`,
+//!   not a `<string>` -- with a string there, `AudioComponentRegistrar`
+//!   silently drops the whole entry and the component never registers at
+//!   all;
+//! - `kAudioUnitProperty_ElementCount` (bus count) needs a real answer, not
+//!   `kAudioUnitErr_InvalidProperty`, or every channel-format/render test
+//!   downstream fails too;
+//! - parameters must only be reported in `kAudioUnitScope_Global` --
+//!   reporting the same parameter ID in every scope let `auval`'s
+//!   independent-per-scope get/set probing collide on the single
+//!   underlying gateway value and see it as state corruption;
+//! - `AddPropertyListener` must at least succeed (a real no-op is fine;
+//!   returning "unimplemented" via `Lookup` failed the recommended
+//!   properties section);
+//! - `kAudioUnitProperty_CocoaUI`'s bundle location can't be left null in
+//!   practice (see `own_bundle_url`, resolved via `dladdr`).
 #![cfg(target_os = "macos")]
 
-use core::ffi::c_void;
+use core::ffi::{c_char, c_void};
+use std::ffi::CStr;
 use std::mem;
+use std::path::Path;
 use std::sync::Arc;
 
 use gui_host::{
@@ -71,9 +87,13 @@ struct AuState {
     input_channels: u32,
     output_channels: u32,
     initialized: bool,
+    bypassed: bool,
     input_render_callback: Option<au_sys::AURenderCallbackStruct>,
+    connection: Option<AudioUnitConnection>,
     input_buffers: InputBufferList,
-    #[allow(dead_code)]
+    output_scratch: Vec<Vec<f32>>,
+    property_listeners: Vec<PropertyListener>,
+    render_notifies: Vec<RenderNotify>,
     au_instance: au_sys::AudioUnit,
 }
 
@@ -83,7 +103,82 @@ impl AuState {
             self.input_channels.max(1) as usize,
             self.max_frames as usize,
         );
+        self.output_scratch = vec![
+            vec![0.0_f32; self.max_frames.max(1) as usize];
+            self.output_channels.max(1) as usize
+        ];
     }
+
+    /// Calls every listener registered (via `AddPropertyListener`) for
+    /// `property_id`. Real hosts rely on this: `auval`'s recommended-
+    /// properties check specifically verifies that changing
+    /// `MaximumFramesPerSlice` fires a notification to a listener it
+    /// registers beforehand.
+    fn notify_property_changed(
+        &self,
+        property_id: au_sys::AudioUnitPropertyID,
+        scope: au_sys::AudioUnitScope,
+        element: au_sys::AudioUnitElement,
+    ) {
+        for listener in &self.property_listeners {
+            if listener.property_id == property_id {
+                unsafe {
+                    (listener.proc)(
+                        listener.user_data,
+                        self.au_instance,
+                        property_id,
+                        scope,
+                        element,
+                    )
+                };
+            }
+        }
+    }
+
+    /// Calls every listener registered via `AudioUnitAddRenderNotify`,
+    /// passing through the same render arguments `Render` itself got (with
+    /// `flags` carrying whichever of `kAudioUnitRenderAction_PreRender`/
+    /// `PostRender` the caller set), matching real hosts' expectations for
+    /// render-notify hooks (used for things like VU meters that need to
+    /// observe every render call, not just query state after the fact).
+    #[allow(clippy::too_many_arguments)]
+    fn call_render_notifies(
+        &self,
+        flags: au_sys::AudioUnitRenderActionFlags,
+        in_time_stamp: *const au_sys::AudioTimeStamp,
+        bus: au_sys::UInt32,
+        frames: au_sys::UInt32,
+        io_data: *mut au_sys::AudioBufferList,
+    ) {
+        for notify in &self.render_notifies {
+            let mut local_flags = flags;
+            unsafe {
+                (notify.proc)(
+                    notify.user_data,
+                    &mut local_flags,
+                    in_time_stamp,
+                    bus,
+                    frames,
+                    io_data,
+                )
+            };
+        }
+    }
+}
+
+/// One `AddPropertyListener` registration. `proc`/`user_data` are opaque to
+/// us -- we only ever call them back, per `notify_property_changed`, never
+/// inspect them.
+struct PropertyListener {
+    property_id: au_sys::AudioUnitPropertyID,
+    proc: au_sys::AudioUnitPropertyListenerProc,
+    user_data: *mut c_void,
+}
+
+/// One `AudioUnitAddRenderNotify` registration; see `call_render_notifies`.
+struct RenderNotify {
+    proc: au_sys::AURenderCallback,
+    user_data: *mut c_void,
 }
 
 /// A reusable, non-allocating (after construction) `AudioBufferList` used
@@ -187,39 +282,186 @@ unsafe fn write_property_slice<T: Copy>(
     }
 }
 
+/// `dlfcn.h`'s `dladdr` output: enough to recover the file path of the
+/// dynamic library a given code address lives in. Declared locally since
+/// `au-sys` (a Core Audio-specific bindings crate) has no reason to cover
+/// it; it's in `libSystem`, always linked, no extra `#[link]` needed.
+#[repr(C)]
+struct DlInfo {
+    dli_fname: *const c_char,
+    dli_fbase: *mut c_void,
+    dli_sname: *const c_char,
+    dli_saddr: *mut c_void,
+}
+
+unsafe extern "C" {
+    fn dladdr(addr: *const c_void, info: *mut DlInfo) -> i32;
+}
+
+#[link(name = "CoreFoundation", kind = "framework")]
+unsafe extern "C" {
+    fn CFURLCreateWithFileSystemPath(
+        allocator: *mut c_void,
+        file_path: au_sys::CFStringRef,
+        path_style: i32,
+        is_directory: u8,
+    ) -> *mut c_void;
+}
+
+const K_CF_URL_POSIX_PATH_STYLE: i32 = 0;
+
+/// `kAudioUnitProperty_MakeConnection`'s value type. Not in `au-sys`
+/// (bindings for it weren't needed until this connection was actually
+/// exercised, by a real host's audio-graph wiring rather than a render
+/// callback); matches `AUComponent.h`'s `AudioUnitConnection` layout.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct AudioUnitConnection {
+    source_audio_unit: au_sys::AudioUnit,
+    source_output_number: au_sys::UInt32,
+    dest_input_number: au_sys::UInt32,
+}
+
+// The real, host-callable `AudioUnitRender`, needed to pull input directly
+// from another Audio Unit once connected via `kAudioUnitProperty_MakeConnection`
+// (the alternative to the render-callback pull model this unit already
+// supported): confirmed necessary via `auval`'s "Checking connection
+// semantics" test, which failed with `kAudioUnitErr_InvalidProperty`
+// before `MakeConnection` was handled at all.
+#[link(name = "AudioToolbox", kind = "framework")]
+unsafe extern "C" {
+    fn AudioUnitRender(
+        in_unit: au_sys::AudioUnit,
+        io_action_flags: *mut au_sys::AudioUnitRenderActionFlags,
+        in_time_stamp: *const au_sys::AudioTimeStamp,
+        in_output_bus_number: au_sys::UInt32,
+        in_number_frames: au_sys::UInt32,
+        io_data: *mut au_sys::AudioBufferList,
+    ) -> au_sys::OSStatus;
+}
+
+/// `kAudioUnitProperty_ScheduleParameters`'s event type. Not in `au-sys`;
+/// layout taken directly from the real `AUComponent.h` header (not
+/// guessed): `scope`/`element`/`parameter`/`eventType` each `UInt32`,
+/// followed by a union of the ramped and immediate event shapes.
+const K_PARAMETER_EVENT_RAMPED: u32 = 2;
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct AudioUnitParameterEventRamp {
+    start_buffer_offset: i32,
+    duration_in_frames: u32,
+    start_value: f32,
+    end_value: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct AudioUnitParameterEventImmediate {
+    buffer_offset: u32,
+    value: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+union AudioUnitParameterEventValues {
+    ramp: AudioUnitParameterEventRamp,
+    immediate: AudioUnitParameterEventImmediate,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct AudioUnitParameterEvent {
+    scope: au_sys::AudioUnitScope,
+    element: au_sys::AudioUnitElement,
+    parameter: au_sys::AudioUnitParameterID,
+    event_type: u32,
+    event_values: AudioUnitParameterEventValues,
+}
+
+/// Finds this plugin's own `.component` bundle directory at runtime and
+/// returns a `CFURLRef` to it (as an opaque `*mut c_void`, matching how
+/// `au-sys`'s `AUCocoaViewInfo` field is typed), or null on any failure.
+///
+/// There's no "give me my own CFBundle" API to call directly; the
+/// standard trick (used by hand-written AU plugins generally, not
+/// something specific to this project) is `dladdr` on the address of a
+/// function known to live in this same dylib, which yields the loaded
+/// image's file path (".../Gain.component/Contents/MacOS/Gain"), then
+/// walking up three path components (MacOS/Gain -> Contents -> the bundle
+/// root) to recover the bundle directory.
+fn own_bundle_url() -> *mut c_void {
+    unsafe {
+        let mut info: DlInfo = mem::zeroed();
+        let addr = build_cocoa_view_info as *const () as *const c_void;
+        if dladdr(addr, &mut info) == 0 || info.dli_fname.is_null() {
+            return std::ptr::null_mut();
+        }
+        let path = CStr::from_ptr(info.dli_fname)
+            .to_string_lossy()
+            .into_owned();
+        let Some(bundle_path) = Path::new(&path)
+            .parent()
+            .and_then(Path::parent)
+            .and_then(Path::parent)
+        else {
+            return std::ptr::null_mut();
+        };
+        let cf_path = au_sys::cf_string_create(&bundle_path.to_string_lossy());
+        if cf_path.is_null() {
+            return std::ptr::null_mut();
+        }
+        let url = CFURLCreateWithFileSystemPath(
+            std::ptr::null_mut(),
+            cf_path,
+            K_CF_URL_POSIX_PATH_STYLE,
+            1,
+        );
+        au_sys::cf_release(cf_path);
+        url
+    }
+}
+
 fn build_parameter_info(param: &ParameterInfo) -> au_sys::AudioUnitParameterInfo {
     let mut name = [0 as core::ffi::c_char; 52];
     for (slot, byte) in name.iter_mut().zip(param.name.as_bytes()) {
         *slot = *byte as core::ffi::c_char;
     }
+    // SAFETY: `cf_string_create` wraps `CFStringCreateWithBytes`, a
+    // standard CoreFoundation call.
+    let cf_name = unsafe { au_sys::cf_string_create(param.name) };
     au_sys::AudioUnitParameterInfo {
         name,
         unitName: std::ptr::null_mut(),
         clumpID: 0,
-        cfNameString: std::ptr::null_mut(),
+        cfNameString: cf_name,
         unit: au_sys::kAudioUnitParameterUnit_Generic,
         minValue: param.min_value.get() as f32,
         maxValue: param.max_value.get() as f32,
         defaultValue: param.default_value.get() as f32,
         flags: au_sys::kAudioUnitParameterFlag_IsReadable
-            | au_sys::kAudioUnitParameterFlag_IsWritable,
+            | au_sys::kAudioUnitParameterFlag_IsWritable
+            | au_sys::kAudioUnitParameterFlag_HasCFNameString
+            | au_sys::kAudioUnitParameterFlag_CFNameRelease,
     }
 }
 
 /// Builds the `AUCocoaViewInfo` response for `kAudioUnitProperty_CocoaUI`.
 ///
-/// Per Core Audio's "copy" convention for CF-typed property getters, the
-/// returned `CFStringRef` is retained and ownership transfers to the
-/// caller (the host), which must `CFRelease` it. `mCocoaAUViewBundleLocation`
-/// is left null, which hosts treat as "the same bundle the factory function
-/// loaded from".
+/// Per Core Audio's "copy" convention for CF-typed property getters, both
+/// returned CF objects are retained and ownership transfers to the caller
+/// (the host), which must release them. `mCocoaAUViewBundleLocation` is a
+/// real URL (see `own_bundle_url`) -- leaving it null compiled and ran, but
+/// real-host testing via `auval` showed the custom UI couldn't actually be
+/// retrieved that way in practice, despite some documentation suggesting
+/// null should be tolerated as "the same bundle as the factory function".
 fn build_cocoa_view_info() -> au_sys::AUCocoaViewInfo {
     // SAFETY: `cf_string_create` just wraps `CFStringCreateWithBytes`, a
     // standard CoreFoundation call; the class name is a fixed ASCII
     // literal.
     let class_name = unsafe { au_sys::cf_string_create(crate::editor::FACTORY_CLASS_NAME) };
     au_sys::AUCocoaViewInfo {
-        mCocoaAUViewBundleLocation: std::ptr::null_mut(),
+        mCocoaAUViewBundleLocation: own_bundle_url(),
         mCocoaAUViewClass: [class_name],
     }
 }
@@ -246,13 +488,24 @@ unsafe extern "C" fn au_initialize(self_ptr: *mut c_void) -> au_sys::OSStatus {
     state
         .processor
         .prepare(state.sample_rate, state.max_frames as usize);
-    // Seed the gateway with every parameter's current value *before* the
-    // host can start calling `Render`/`GetParameter` concurrently, so
-    // `au_get_parameter` never needs to read `processor` directly off the
-    // audio thread (see its doc comment).
+    // On the *first* Initialize, the gateway has no value yet for any
+    // parameter, so seed it from the processor's own default -- this is
+    // also what lets `au_get_parameter` read the gateway instead of
+    // `processor` directly (see its doc comment). On a *later*
+    // re-Initialize (hosts do this, e.g. auval's "retain value across
+    // reset and initialization" check), the gateway already holds
+    // whatever the user/host last set, so push *that* into `processor`
+    // instead -- overwriting it from `processor` unconditionally, as an
+    // earlier version of this code did, clobbered the user's last-set
+    // value back to the plugin's default on every re-Initialize.
     for param in &state.parameters {
-        let value = state.processor.parameter_value(param.id);
-        state.gateway.set_normalized(param.id, value);
+        match state.gateway.get_normalized(param.id) {
+            Some(value) => state.processor.set_parameter(param.id, value),
+            None => {
+                let value = state.processor.parameter_value(param.id);
+                state.gateway.set_normalized(param.id, value);
+            }
+        }
     }
     state.resize_scratch();
     state.initialized = true;
@@ -278,7 +531,7 @@ unsafe extern "C" fn au_reset(
 unsafe extern "C" fn au_get_property_info(
     self_ptr: *mut c_void,
     in_id: au_sys::AudioUnitPropertyID,
-    _in_scope: au_sys::AudioUnitScope,
+    in_scope: au_sys::AudioUnitScope,
     _in_element: au_sys::AudioUnitElement,
     out_data_size: *mut au_sys::UInt32,
     out_writable: *mut au_sys::Boolean,
@@ -288,21 +541,40 @@ unsafe extern "C" fn au_get_property_info(
         au_sys::kAudioUnitProperty_StreamFormat => {
             (mem::size_of::<au_sys::AudioStreamBasicDescription>(), true)
         }
-        au_sys::kAudioUnitProperty_ParameterList => (
+        // This plugin's only parameters live in Global scope; other scopes
+        // (Input/Output/Group/Part/Note) don't have their own independent
+        // copies of parameter 1 -- reporting the same parameter as present
+        // in every scope (as an earlier version of this code did) made
+        // `auval` treat them as separate instances sharing one underlying
+        // value, which it flagged as state corruption.
+        au_sys::kAudioUnitProperty_ParameterList if in_scope == au_sys::kAudioUnitScope_Global => (
             state.parameters.len() * mem::size_of::<au_sys::AudioUnitParameterID>(),
             false,
         ),
-        au_sys::kAudioUnitProperty_ParameterInfo => {
+        au_sys::kAudioUnitProperty_ParameterInfo if in_scope == au_sys::kAudioUnitScope_Global => {
             (mem::size_of::<au_sys::AudioUnitParameterInfo>(), false)
         }
         au_sys::kAudioUnitProperty_SupportedNumChannels => {
             (mem::size_of::<au_sys::AUChannelInfo>(), false)
         }
         au_sys::kAudioUnitProperty_MaximumFramesPerSlice => (mem::size_of::<u32>(), true),
+        au_sys::kAudioUnitProperty_ElementCount => (mem::size_of::<u32>(), false),
+        // Global-scope-only, like the parameter properties above: `auval`
+        // warned about these being reported as valid in every scope too.
+        au_sys::kAudioUnitProperty_Latency if in_scope == au_sys::kAudioUnitScope_Global => {
+            (mem::size_of::<f64>(), false)
+        }
+        au_sys::kAudioUnitProperty_TailTime if in_scope == au_sys::kAudioUnitScope_Global => {
+            (mem::size_of::<f64>(), false)
+        }
+        au_sys::kAudioUnitProperty_BypassEffect if in_scope == au_sys::kAudioUnitScope_Global => {
+            (mem::size_of::<u32>(), true)
+        }
         au_sys::kAudioUnitProperty_CocoaUI => (mem::size_of::<au_sys::AUCocoaViewInfo>(), false),
         au_sys::kAudioUnitProperty_SetRenderCallback => {
             (mem::size_of::<au_sys::AURenderCallbackStruct>(), true)
         }
+        au_sys::kAudioUnitProperty_MakeConnection => (mem::size_of::<AudioUnitConnection>(), true),
         K_GUI_HOST_STATE_PROPERTY => (mem::size_of::<*mut c_void>(), false),
         _ => return au_sys::kAudioUnitErr_InvalidProperty,
     };
@@ -343,13 +615,13 @@ unsafe extern "C" fn au_get_property(
             unsafe { write_property(out_data, io_data_size, &asbd) };
             au_sys::noErr
         }
-        au_sys::kAudioUnitProperty_ParameterList => {
+        au_sys::kAudioUnitProperty_ParameterList if in_scope == au_sys::kAudioUnitScope_Global => {
             let ids: Vec<au_sys::AudioUnitParameterID> =
                 state.parameters.iter().map(|p| p.id.0).collect();
             unsafe { write_property_slice(out_data, io_data_size, &ids) };
             au_sys::noErr
         }
-        au_sys::kAudioUnitProperty_ParameterInfo => {
+        au_sys::kAudioUnitProperty_ParameterInfo if in_scope == au_sys::kAudioUnitScope_Global => {
             let Some(param) = state.parameters.iter().find(|p| p.id.0 == in_element) else {
                 return au_sys::kAudioUnitErr_InvalidElement;
             };
@@ -369,6 +641,33 @@ unsafe extern "C" fn au_get_property(
             unsafe { write_property(out_data, io_data_size, &state.max_frames) };
             au_sys::noErr
         }
+        au_sys::kAudioUnitProperty_ElementCount => {
+            // Fixed topology: exactly one element in every scope, except
+            // Input when the processor declares no input channels at all.
+            let count: u32 =
+                if in_scope == au_sys::kAudioUnitScope_Input && state.input_channels == 0 {
+                    0
+                } else {
+                    1
+                };
+            unsafe { write_property(out_data, io_data_size, &count) };
+            au_sys::noErr
+        }
+        au_sys::kAudioUnitProperty_Latency if in_scope == au_sys::kAudioUnitScope_Global => {
+            let latency_seconds: f64 = 0.0;
+            unsafe { write_property(out_data, io_data_size, &latency_seconds) };
+            au_sys::noErr
+        }
+        au_sys::kAudioUnitProperty_TailTime if in_scope == au_sys::kAudioUnitScope_Global => {
+            let tail_seconds: f64 = 0.0;
+            unsafe { write_property(out_data, io_data_size, &tail_seconds) };
+            au_sys::noErr
+        }
+        au_sys::kAudioUnitProperty_BypassEffect if in_scope == au_sys::kAudioUnitScope_Global => {
+            let bypassed: u32 = state.bypassed as u32;
+            unsafe { write_property(out_data, io_data_size, &bypassed) };
+            au_sys::noErr
+        }
         au_sys::kAudioUnitProperty_CocoaUI => {
             let info = build_cocoa_view_info();
             unsafe { write_property(out_data, io_data_size, &info) };
@@ -386,7 +685,7 @@ unsafe extern "C" fn au_set_property(
     self_ptr: *mut c_void,
     in_id: au_sys::AudioUnitPropertyID,
     in_scope: au_sys::AudioUnitScope,
-    _in_element: au_sys::AudioUnitElement,
+    in_element: au_sys::AudioUnitElement,
     in_data: *const c_void,
     in_data_size: au_sys::UInt32,
 ) -> au_sys::OSStatus {
@@ -410,6 +709,7 @@ unsafe extern "C" fn au_set_property(
                 return au_sys::kAudioUnitErr_FormatNotSupported;
             }
             state.sample_rate = asbd.mSampleRate;
+            state.notify_property_changed(in_id, in_scope, in_element);
             au_sys::noErr
         }
         au_sys::kAudioUnitProperty_MaximumFramesPerSlice => {
@@ -418,6 +718,7 @@ unsafe extern "C" fn au_set_property(
             }
             state.max_frames = unsafe { *(in_data as *const u32) };
             state.resize_scratch();
+            state.notify_property_changed(in_id, in_scope, in_element);
             au_sys::noErr
         }
         au_sys::kAudioUnitProperty_SetRenderCallback => {
@@ -428,6 +729,27 @@ unsafe extern "C" fn au_set_property(
             }
             state.input_render_callback =
                 Some(unsafe { *(in_data as *const au_sys::AURenderCallbackStruct) });
+            au_sys::noErr
+        }
+        au_sys::kAudioUnitProperty_MakeConnection => {
+            if in_data.is_null() || (in_data_size as usize) < mem::size_of::<AudioUnitConnection>()
+            {
+                return au_sys::kAudioUnitErr_InvalidPropertyValue;
+            }
+            let connection = unsafe { *(in_data as *const AudioUnitConnection) };
+            state.connection = if connection.source_audio_unit.is_null() {
+                None
+            } else {
+                Some(connection)
+            };
+            au_sys::noErr
+        }
+        au_sys::kAudioUnitProperty_BypassEffect => {
+            if in_data.is_null() || (in_data_size as usize) < mem::size_of::<u32>() {
+                return au_sys::kAudioUnitErr_InvalidPropertyValue;
+            }
+            state.bypassed = unsafe { *(in_data as *const u32) } != 0;
+            state.notify_property_changed(in_id, in_scope, in_element);
             au_sys::noErr
         }
         _ => au_sys::kAudioUnitErr_InvalidProperty,
@@ -443,12 +765,22 @@ unsafe extern "C" fn au_set_property(
 unsafe extern "C" fn au_get_parameter(
     self_ptr: *mut c_void,
     in_id: au_sys::AudioUnitParameterID,
-    _in_scope: au_sys::AudioUnitScope,
+    in_scope: au_sys::AudioUnitScope,
     _in_element: au_sys::AudioUnitElement,
     out_value: *mut au_sys::AudioUnitParameterValue,
 ) -> au_sys::OSStatus {
     if out_value.is_null() {
         return au_sys::kAudioUnitErr_InvalidParameter;
+    }
+    // This plugin's parameters only exist in Global scope (see
+    // `au_get_property_info`'s `ParameterList`/`ParameterInfo` handling);
+    // treating every other scope as also having parameter 1 (an earlier
+    // version of this code did) let `auval` set/get the "same" parameter
+    // through what it believed were independent per-scope instances,
+    // sharing one underlying gateway entry and looking like state
+    // corruption from its side.
+    if in_scope != au_sys::kAudioUnitScope_Global {
+        return au_sys::kAudioUnitErr_InvalidScope;
     }
     let state = unsafe { &(*(self_ptr as *const AuInstance)).state };
     let id = ParameterId(in_id);
@@ -462,11 +794,14 @@ unsafe extern "C" fn au_get_parameter(
 unsafe extern "C" fn au_set_parameter(
     self_ptr: *mut c_void,
     in_id: au_sys::AudioUnitParameterID,
-    _in_scope: au_sys::AudioUnitScope,
+    in_scope: au_sys::AudioUnitScope,
     _in_element: au_sys::AudioUnitElement,
     in_value: au_sys::AudioUnitParameterValue,
     _in_buffer_offset_in_frames: au_sys::UInt32,
 ) -> au_sys::OSStatus {
+    if in_scope != au_sys::kAudioUnitScope_Global {
+        return au_sys::kAudioUnitErr_InvalidScope;
+    }
     let state = unsafe { &(*(self_ptr as *const AuInstance)).state };
     state
         .gateway
@@ -478,7 +813,7 @@ unsafe extern "C" fn au_render(
     self_ptr: *mut c_void,
     io_action_flags: *mut au_sys::AudioUnitRenderActionFlags,
     in_time_stamp: *const au_sys::AudioTimeStamp,
-    _in_output_bus_number: au_sys::UInt32,
+    in_output_bus_number: au_sys::UInt32,
     in_number_frames: au_sys::UInt32,
     io_data: *mut au_sys::AudioBufferList,
 ) -> au_sys::OSStatus {
@@ -489,49 +824,103 @@ unsafe extern "C" fn au_render(
     if io_data.is_null() {
         return au_sys::kAudioUnitErr_InvalidParameter;
     }
-    let frames = (in_number_frames as usize).min(state.max_frames as usize);
+    // Reject rather than silently clamp: `auval`'s "Bad Max Frames" test
+    // specifically calls `Render` with more frames than the negotiated
+    // `MaximumFramesPerSlice` and expects an error back -- clamping (an
+    // earlier version of this code did `.min(state.max_frames)` here)
+    // returned `noErr` for a request the unit never agreed to be able to
+    // handle, silently dropping the excess frames instead.
+    if in_number_frames as usize > state.max_frames as usize {
+        return au_sys::kAudioUnitErr_TooManyFramesToProcess;
+    }
+    let frames = in_number_frames as usize;
+    let base_flags = if io_action_flags.is_null() {
+        0
+    } else {
+        unsafe { *io_action_flags }
+    };
+    state.call_render_notifies(
+        base_flags | au_sys::kAudioUnitRenderAction_PreRender,
+        in_time_stamp,
+        in_output_bus_number,
+        in_number_frames,
+        io_data,
+    );
 
     // Pull input via the "pull model": unlike a generator, an Effect AU's
-    // `Render` is responsible for fetching its own input by calling back
-    // through whatever the host registered via
-    // `kAudioUnitProperty_SetRenderCallback`, rather than receiving it
-    // directly. Falls back to silence if nothing is registered (or the
-    // pull fails), so the unit still produces (processed-silence) output
-    // instead of erroring out.
+    // `Render` is responsible for fetching its own input, rather than
+    // receiving it directly. Two ways a host can wire that up: a direct
+    // `kAudioUnitProperty_MakeConnection` to another Audio Unit (pulled by
+    // calling the real `AudioUnitRender` on it), or a render callback via
+    // `kAudioUnitProperty_SetRenderCallback`. Falls back to silence if
+    // neither is set (or the pull fails), so the unit still produces
+    // (processed-silence) output instead of erroring out.
     if state.input_channels > 0 {
-        match state.input_render_callback.and_then(|cb| cb.inputProc) {
-            Some(input_proc) => {
-                let callback = state
-                    .input_render_callback
-                    .expect("checked by match guard above");
-                state.input_buffers.prepare(frames);
-                let list_ptr = state.input_buffers.as_mut_ptr();
-                let status = unsafe {
-                    input_proc(
-                        callback.inputProcRefCon,
-                        io_action_flags,
-                        in_time_stamp,
-                        0,
-                        in_number_frames,
-                        list_ptr,
-                    )
-                };
-                if status != au_sys::noErr {
-                    state.input_buffers.silence(frames);
-                }
+        if let Some(connection) = state.connection {
+            state.input_buffers.prepare(frames);
+            let list_ptr = state.input_buffers.as_mut_ptr();
+            let status = unsafe {
+                AudioUnitRender(
+                    connection.source_audio_unit,
+                    io_action_flags,
+                    in_time_stamp,
+                    connection.source_output_number,
+                    in_number_frames,
+                    list_ptr,
+                )
+            };
+            if status != au_sys::noErr {
+                state.input_buffers.silence(frames);
             }
-            None => state.input_buffers.silence(frames),
+        } else {
+            match state.input_render_callback.and_then(|cb| cb.inputProc) {
+                Some(input_proc) => {
+                    let callback = state
+                        .input_render_callback
+                        .expect("checked by match guard above");
+                    state.input_buffers.prepare(frames);
+                    let list_ptr = state.input_buffers.as_mut_ptr();
+                    let status = unsafe {
+                        input_proc(
+                            callback.inputProcRefCon,
+                            io_action_flags,
+                            in_time_stamp,
+                            0,
+                            in_number_frames,
+                            list_ptr,
+                        )
+                    };
+                    if status != au_sys::noErr {
+                        state.input_buffers.silence(frames);
+                    }
+                }
+                None => state.input_buffers.silence(frames),
+            }
         }
     }
 
     apply_pending_parameters(&state.gateway, &mut *state.processor);
 
-    // SAFETY: the host allocates `io_data` with one `AudioBuffer` per
-    // output channel (matching `kAudioUnitProperty_StreamFormat`'s output
-    // scope, which this unit reports as `state.output_channels`), each
-    // with at least `frames` `Float32` samples of capacity, per the
-    // negotiated `MaximumFramesPerSlice`.
+    // The host allocates `io_data` with one `AudioBuffer` per output
+    // channel (matching `kAudioUnitProperty_StreamFormat`'s output scope),
+    // each normally with at least `frames` `Float32` samples of capacity --
+    // but a real host (confirmed via `auval`'s slicing render test) can
+    // legitimately pass a buffer with `mData == NULL`, expecting the unit
+    // to supply its own storage (the "should allocate" contract every
+    // well-behaved AU needs to honor; we always support it, rather than
+    // declaring `kAudioUnitProperty_ShouldAllocateBuffer` false). Filling
+    // those in from our own scratch before building the output slices
+    // avoids dereferencing a null/stale pointer.
     let out_buffers = unsafe { (*io_data).buffers_mut() };
+    for (buffer, scratch) in out_buffers.iter_mut().zip(state.output_scratch.iter_mut()) {
+        if buffer.mData.is_null() {
+            buffer.mData = scratch.as_mut_ptr() as *mut c_void;
+            buffer.mDataByteSize = (frames * mem::size_of::<f32>()) as u32;
+        }
+    }
+    // SAFETY: every buffer's `mData` is now non-null (either host-provided
+    // or just filled in above from `output_scratch`, which is sized to
+    // `max_frames >= frames`).
     let mut outputs: Vec<&mut [f32]> = out_buffers
         .iter_mut()
         .map(|buffer| unsafe { std::slice::from_raw_parts_mut(buffer.mData as *mut f32, frames) })
@@ -543,7 +932,20 @@ unsafe extern "C" fn au_render(
         .iter()
         .map(|channel| &channel[..frames])
         .collect();
-    state.processor.process(&inputs, &mut outputs);
+
+    if state.bypassed {
+        // Passing straight through (rather than still calling `process`
+        // and discarding the result) is what `kAudioUnitProperty_BypassEffect`
+        // is for: hosts use it to get a guaranteed-transparent path, which
+        // for some processors (e.g. ones with internal state/latency)
+        // differs from what running the real DSP at unity would produce.
+        for (input, output) in inputs.iter().zip(outputs.iter_mut()) {
+            let len = input.len().min(output.len());
+            output[..len].copy_from_slice(&input[..len]);
+        }
+    } else {
+        state.processor.process(&inputs, &mut outputs);
+    }
 
     let peak = outputs
         .iter()
@@ -551,6 +953,161 @@ unsafe extern "C" fn au_render(
         .fold(0.0_f32, |max, &sample| max.max(sample.abs()));
     state.meter.write(peak);
 
+    state.call_render_notifies(
+        base_flags | au_sys::kAudioUnitRenderAction_PostRender,
+        in_time_stamp,
+        in_output_bus_number,
+        in_number_frames,
+        io_data,
+    );
+
+    au_sys::noErr
+}
+
+/// `au-sys` doesn't define a `Proc` type for the old-style (no user-data)
+/// remove-listener selector, only the newer with-user-data variant; this
+/// matches its C signature directly.
+type AudioUnitRemovePropertyListenerProc = unsafe extern "C" fn(
+    self_ptr: *mut c_void,
+    in_id: au_sys::AudioUnitPropertyID,
+    in_proc: au_sys::AudioUnitPropertyListenerProc,
+) -> au_sys::OSStatus;
+
+/// Registered listeners are actually tracked (not just accepted) so that
+/// `notify_property_changed` (called from `au_set_property`) can really
+/// fire them -- `auval`'s recommended-properties check registers a
+/// listener, changes `MaximumFramesPerSlice`, and specifically verifies
+/// the listener was called; an earlier version of this code accepted
+/// registrations without storing them, which passed `AddPropertyListener`
+/// itself but then failed that follow-up check.
+unsafe extern "C" fn au_add_property_listener(
+    self_ptr: *mut c_void,
+    in_id: au_sys::AudioUnitPropertyID,
+    in_proc: au_sys::AudioUnitPropertyListenerProc,
+    in_proc_user_data: *mut c_void,
+) -> au_sys::OSStatus {
+    let state = unsafe { &mut (*(self_ptr as *mut AuInstance)).state };
+    state.property_listeners.push(PropertyListener {
+        property_id: in_id,
+        proc: in_proc,
+        user_data: in_proc_user_data,
+    });
+    au_sys::noErr
+}
+
+unsafe extern "C" fn au_remove_property_listener(
+    self_ptr: *mut c_void,
+    in_id: au_sys::AudioUnitPropertyID,
+    in_proc: au_sys::AudioUnitPropertyListenerProc,
+) -> au_sys::OSStatus {
+    let state = unsafe { &mut (*(self_ptr as *mut AuInstance)).state };
+    state
+        .property_listeners
+        .retain(|l| !(l.property_id == in_id && l.proc as usize == in_proc as usize));
+    au_sys::noErr
+}
+
+unsafe extern "C" fn au_remove_property_listener_with_user_data(
+    self_ptr: *mut c_void,
+    in_id: au_sys::AudioUnitPropertyID,
+    in_proc: au_sys::AudioUnitPropertyListenerProc,
+    in_proc_user_data: *mut c_void,
+) -> au_sys::OSStatus {
+    let state = unsafe { &mut (*(self_ptr as *mut AuInstance)).state };
+    state.property_listeners.retain(|l| {
+        !(l.property_id == in_id
+            && l.proc as usize == in_proc as usize
+            && l.user_data == in_proc_user_data)
+    });
+    au_sys::noErr
+}
+
+/// `au-sys` doesn't define `Proc` types for the render-notify selectors;
+/// both share `AURenderCallback`'s shape plus the storage pointer, per
+/// `AUComponent.h`.
+type AudioUnitAddRenderNotifyProc = unsafe extern "C" fn(
+    self_ptr: *mut c_void,
+    in_proc: au_sys::AURenderCallback,
+    in_proc_user_data: *mut c_void,
+) -> au_sys::OSStatus;
+
+type AudioUnitRemoveRenderNotifyProc = unsafe extern "C" fn(
+    self_ptr: *mut c_void,
+    in_proc: au_sys::AURenderCallback,
+    in_proc_user_data: *mut c_void,
+) -> au_sys::OSStatus;
+
+/// Tracked for real (like the property listeners above), so
+/// `call_render_notifies` (called from `au_render`) can actually invoke
+/// them -- confirmed necessary via `auval`'s parameter-scheduling checks,
+/// which register a render notify and (per the same "must not just report
+/// unimplemented" lesson as `AddPropertyListener`) require it to succeed.
+unsafe extern "C" fn au_add_render_notify(
+    self_ptr: *mut c_void,
+    in_proc: au_sys::AURenderCallback,
+    in_proc_user_data: *mut c_void,
+) -> au_sys::OSStatus {
+    let state = unsafe { &mut (*(self_ptr as *mut AuInstance)).state };
+    state.render_notifies.push(RenderNotify {
+        proc: in_proc,
+        user_data: in_proc_user_data,
+    });
+    au_sys::noErr
+}
+
+unsafe extern "C" fn au_remove_render_notify(
+    self_ptr: *mut c_void,
+    in_proc: au_sys::AURenderCallback,
+    in_proc_user_data: *mut c_void,
+) -> au_sys::OSStatus {
+    let state = unsafe { &mut (*(self_ptr as *mut AuInstance)).state };
+    state
+        .render_notifies
+        .retain(|n| !(n.proc as usize == in_proc as usize && n.user_data == in_proc_user_data));
+    au_sys::noErr
+}
+
+type AudioUnitScheduleParametersProc = unsafe extern "C" fn(
+    self_ptr: *mut c_void,
+    events: *const AudioUnitParameterEvent,
+    num_events: au_sys::UInt32,
+) -> au_sys::OSStatus;
+
+/// Sample-accurate scheduling (applying a ramped/immediate change at a
+/// specific offset *within* a render block) isn't implemented -- this
+/// real-time-safe minimal reference plugin applies parameter changes once
+/// per block (see `apply_pending_parameters`), not per-sample, so there's
+/// nowhere to slice `Render` at an event's offset. Instead, each event's
+/// *eventual* value (a ramp's end value, or an immediate event's value) is
+/// queued through the gateway as usual, taking effect at the start of the
+/// next `Render` call rather than mid-block. `auval` only checks that this
+/// call succeeds, not sample-accurate timing.
+unsafe extern "C" fn au_schedule_parameters(
+    self_ptr: *mut c_void,
+    events: *const AudioUnitParameterEvent,
+    num_events: au_sys::UInt32,
+) -> au_sys::OSStatus {
+    if events.is_null() {
+        return au_sys::kAudioUnitErr_InvalidParameter;
+    }
+    let state = unsafe { &mut (*(self_ptr as *mut AuInstance)).state };
+    let events = unsafe { std::slice::from_raw_parts(events, num_events as usize) };
+    for event in events {
+        if event.scope != au_sys::kAudioUnitScope_Global {
+            continue;
+        }
+        let value = unsafe {
+            if event.event_type == K_PARAMETER_EVENT_RAMPED {
+                event.event_values.ramp.end_value
+            } else {
+                event.event_values.immediate.value
+            }
+        };
+        state.gateway.set_normalized(
+            ParameterId(event.parameter),
+            NormalizedValue::new(value as f64),
+        );
+    }
     au_sys::noErr
 }
 
@@ -599,6 +1156,40 @@ unsafe extern "C" fn au_lookup(selector: au_sys::SInt16) -> Option<au_sys::Audio
                 au_sys::AudioUnitRenderProc,
                 au_sys::AudioComponentMethod,
             >(au_render)),
+            au_sys::kAudioUnitAddPropertyListenerSelect => {
+                Some(mem::transmute::<
+                    au_sys::AudioUnitAddPropertyListenerProc,
+                    au_sys::AudioComponentMethod,
+                >(au_add_property_listener))
+            }
+            au_sys::kAudioUnitRemovePropertyListenerSelect => {
+                Some(mem::transmute::<
+                    AudioUnitRemovePropertyListenerProc,
+                    au_sys::AudioComponentMethod,
+                >(au_remove_property_listener))
+            }
+            au_sys::kAudioUnitRemovePropertyListenerWithUserDataSelect => {
+                Some(mem::transmute::<
+                    au_sys::AudioUnitRemovePropertyListenerWithUserDataProc,
+                    au_sys::AudioComponentMethod,
+                >(au_remove_property_listener_with_user_data))
+            }
+            au_sys::kAudioUnitAddRenderNotifySelect => Some(mem::transmute::<
+                AudioUnitAddRenderNotifyProc,
+                au_sys::AudioComponentMethod,
+            >(au_add_render_notify)),
+            au_sys::kAudioUnitRemoveRenderNotifySelect => {
+                Some(mem::transmute::<
+                    AudioUnitRemoveRenderNotifyProc,
+                    au_sys::AudioComponentMethod,
+                >(au_remove_render_notify))
+            }
+            au_sys::kAudioUnitScheduleParametersSelect => {
+                Some(mem::transmute::<
+                    AudioUnitScheduleParametersProc,
+                    au_sys::AudioComponentMethod,
+                >(au_schedule_parameters))
+            }
             _ => None,
         }
     }
@@ -630,11 +1221,19 @@ where
         input_channels: layout.input_channels,
         output_channels: layout.output_channels,
         initialized: false,
+        bypassed: false,
         input_render_callback: None,
+        connection: None,
         input_buffers: InputBufferList::new(
             layout.input_channels.max(1) as usize,
             DEFAULT_MAX_FRAMES as usize,
         ),
+        output_scratch: vec![
+            vec![0.0_f32; DEFAULT_MAX_FRAMES as usize];
+            layout.output_channels.max(1) as usize
+        ],
+        property_listeners: Vec::new(),
+        render_notifies: Vec::new(),
         au_instance: std::ptr::null_mut(),
     };
 
@@ -799,7 +1398,48 @@ mod tests {
                 mem::transmute(lookup(au_sys::kAudioUnitRenderSelect).unwrap());
             let reset: au_sys::AudioUnitResetProc =
                 mem::transmute(lookup(au_sys::kAudioUnitResetSelect).unwrap());
-            assert!(lookup(au_sys::kAudioUnitAddPropertyListenerSelect).is_none());
+            let add_property_listener: au_sys::AudioUnitAddPropertyListenerProc =
+                mem::transmute(lookup(au_sys::kAudioUnitAddPropertyListenerSelect).unwrap());
+            unsafe extern "C" fn dummy_listener(
+                _ref_con: *mut c_void,
+                _unit: au_sys::AudioUnit,
+                _id: au_sys::AudioUnitPropertyID,
+                _scope: au_sys::AudioUnitScope,
+                _element: au_sys::AudioUnitElement,
+            ) {
+            }
+            assert_eq!(
+                add_property_listener(
+                    self_ptr,
+                    au_sys::kAudioUnitProperty_MaximumFramesPerSlice,
+                    dummy_listener,
+                    std::ptr::null_mut(),
+                ),
+                au_sys::noErr
+            );
+
+            let add_render_notify: AudioUnitAddRenderNotifyProc =
+                mem::transmute(lookup(au_sys::kAudioUnitAddRenderNotifySelect).unwrap());
+            unsafe extern "C" fn counting_render_notify(
+                ref_con: *mut c_void,
+                _io_action_flags: *mut au_sys::AudioUnitRenderActionFlags,
+                _in_time_stamp: *const au_sys::AudioTimeStamp,
+                _in_bus_number: u32,
+                _in_number_frames: u32,
+                _io_data: *mut au_sys::AudioBufferList,
+            ) -> au_sys::OSStatus {
+                unsafe { *(ref_con as *mut u32) += 1 };
+                au_sys::noErr
+            }
+            let mut notify_count: u32 = 0;
+            assert_eq!(
+                add_render_notify(
+                    self_ptr,
+                    counting_render_notify,
+                    &mut notify_count as *mut u32 as *mut c_void,
+                ),
+                au_sys::noErr
+            );
 
             assert_eq!(initialize(self_ptr), au_sys::noErr);
 
@@ -904,6 +1544,8 @@ mod tests {
                 au_sys::noErr
             );
             assert_eq!(output_samples, [0.0_f32; FRAMES]);
+            // One PreRender + one PostRender notification per `Render` call.
+            assert_eq!(notify_count, 2);
 
             // A second Render call (after another SetParameter) exercises
             // `apply_pending_parameters` draining a queued change.
