@@ -22,7 +22,7 @@ rust-version = "1.85"
 authors = ["Minjae Kim <minjaekim@mkaudio.company>"]
 license = "MIT OR Apache-2.0"
 description = "Cross-platform retained-mode GUI framework for VST3/AU/AAX audio plugins"
-repository = "https://github.com/mkaudio-official/rust-plugin-gui-framework"
+repository = "https://github.com/mkaudio-company/rust-plugin-gui-framework"
 documentation = "https://docs.rs/rust-plugin-gui-framework"
 
 [workspace.dependencies]
