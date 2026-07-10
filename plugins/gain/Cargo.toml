@@ -1,0 +1,37 @@
+[package]
+name = "gain-plugin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "gain_plugin"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "gain-standalone"
+path = "src/bin/standalone.rs"
+required-features = ["standalone"]
+
+[features]
+default = []
+standalone = ["dep:gui-standalone"]
+vst3 = ["dep:gui-vst3"]
+au = ["dep:gui-au"]
+
+[dependencies]
+gui-core = { workspace = true }
+gui-host = { workspace = true }
+gui-res = { workspace = true }
+gui-widgets = { workspace = true }
+gui-standalone = { workspace = true, optional = true }
+gui-vst3 = { workspace = true, optional = true }
+gui-au = { workspace = true, optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+gui-mac = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+gui-win32 = { workspace = true }

@@ -373,6 +373,7 @@ fn lock_view_context(
     }
 
     let view = view as *mut Object;
+
     let locked: BOOL = unsafe { msg_send![view, lockFocusIfCanDraw] };
     if locked != YES {
         return None;

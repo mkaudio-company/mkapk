@@ -1,24 +1,30 @@
-#![deny(unsafe_code)]
-
+//! The plugin's editor UI. This is the ONE UI file — every build target
+//! (Standalone/VST3/AU/AAX) shares this same `GainEditor` implementation of
+//! `gui_host::PluginEditor`. The processor lives separately in
+//! `crate::processor`; the two are wired together only via
+//! `gui_host::LockFreeParameterGateway`, never a direct reference to each
+//! other, so this file has no audio-thread/real-time concerns at all.
 use std::cell::Cell;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gui_core::{
-    Animation, AnimationController, AnimationCurve, AnimationEvent, AnimationId, Color,
-    CommandList, ImageId, Insetsf, LayoutConstraints, LayoutDirection, LayoutEngine, LayoutNode,
-    LayoutResult, PaintCommand, Pointf, Rectf, Sizef, TextLayoutId, TraverseOrder, Tree, Widget,
-    WidgetId, downcast_widget_ref,
+    Color, CommandList, Event, EventDispatcher, EventResponse, ImageId, Insetsf, LayoutConstraints,
+    LayoutDirection, LayoutEngine, LayoutNode, LayoutResult, MouseEvent, PaintCommand,
+    PointerEvent, Pointf, Rectf, Sizef, TextLayoutId, TraverseOrder, Tree, Widget, WidgetId,
+    downcast_widget_ref,
 };
 use gui_host::{
     EditorHost, LockFreeParameterGateway, NormalizedValue, ParameterGateway, ParameterId,
-    ParentWindowHandle, PluginEditor, SizeConstraints,
+    ParentWindowHandle, PeakMeter, PluginEditor, SizeConstraints,
 };
 use gui_res::{
-    PngImage, Resource, ResourceBundle, ResourceHandle, ResourceId, ResourceRegistry, SvgImage,
+    PngImage, Resource, ResourceBundle, ResourceHandle, ResourceId, ResourceRegistry,
     generated::EMBEDDED,
 };
-use gui_widgets::{Label, Slider, Theme};
+use gui_widgets::{Knob, Label, Slider, Theme};
+
+use crate::processor::GAIN_PARAM;
 
 #[cfg(target_os = "macos")]
 type ImageRegistry = gui_mac::ImageRegistry;
@@ -71,21 +77,18 @@ impl Widget for Panel {
     }
 }
 
-struct GainEditor {
+pub struct GainEditor {
     view: *mut core::ffi::c_void,
     size: Sizef,
     tree: Tree,
     layout_engine: LayoutEngine,
     layout: LayoutResult,
-    #[allow(dead_code)]
     gateway: Arc<LockFreeParameterGateway>,
-    commands: CommandList,
-    animation_controller: AnimationController<f32>,
-    peak_meter_id: AnimationId,
-    peak_meter_value: f32,
-    peak_meter_direction: bool,
+    meter: PeakMeter,
+    meter_value: f32,
     last_frame: Option<Instant>,
-    knob_handle: ResourceHandle<SvgImage>,
+    mouse_capture: Option<WidgetId>,
+    commands: CommandList,
     logo_handle: ResourceHandle<PngImage>,
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     image_registry: ImageRegistry,
@@ -96,11 +99,17 @@ struct GainEditor {
     accessibility_handle: Option<gui_mac::AccessibilityElementHandle>,
     _panel: WidgetId,
     _label: WidgetId,
-    _slider: WidgetId,
+    slider_id: WidgetId,
+    knob_id: WidgetId,
 }
 
 impl GainEditor {
-    fn new() -> Self {
+    /// `gateway` should be the same `Arc<LockFreeParameterGateway>` driving
+    /// the paired `GainProcessor`'s real-time callback, and `meter` the same
+    /// `PeakMeter` that callback writes the real output level into (see
+    /// `gui-standalone` or the VST3/AU entry points for how each format
+    /// wires this up).
+    pub fn new(gateway: Arc<LockFreeParameterGateway>, meter: PeakMeter) -> Self {
         let theme = Theme::default();
         let mut tree = Tree::new();
 
@@ -112,27 +121,26 @@ impl GainEditor {
         let label_id = label.id();
         tree.insert(Box::new(label), Some(root));
 
-        let parameter_id = ParameterId(1);
-        let slider = Slider::new(parameter_id, NormalizedValue::new(0.5), theme);
-        let slider_id = slider.id();
+        // Both widgets control the same `GAIN_PARAM`; `sync_widget_values`
+        // keeps them showing the same value regardless of which one the
+        // user is dragging (see `on_mouse_down`/`on_mouse_move`).
+        let initial_gain = NormalizedValue::new(1.0);
 
-        let gateway = Arc::new(LockFreeParameterGateway::new(256));
+        let slider = Slider::new(GAIN_PARAM, initial_gain, theme);
+        let slider_id = slider.id();
         let gateway_for_slider = gateway.clone();
         slider.on_changed(move |id, value| {
             gateway_for_slider.set_normalized(id, value);
-            let db = if value.get() > 0.0 {
-                20.0 * value.get().log10()
-            } else {
-                f64::NEG_INFINITY
-            };
-            println!(
-                "parameter {} changed to {:.4} ({:.1} dB)",
-                id.0,
-                value.get(),
-                db
-            );
         });
         tree.insert(Box::new(slider), Some(root));
+
+        let knob = Knob::new(GAIN_PARAM, initial_gain, theme);
+        let knob_id = knob.id();
+        let gateway_for_knob = gateway.clone();
+        knob.on_changed(move |id, value| {
+            gateway_for_knob.set_normalized(id, value);
+        });
+        tree.insert(Box::new(knob), Some(root));
 
         let mut layout_engine = LayoutEngine::new();
         layout_engine.set_node(LayoutNode {
@@ -143,7 +151,7 @@ impl GainEditor {
         });
 
         let margin = Insetsf::uniform(4.0);
-        for &id in &[label_id, slider_id] {
+        for &id in &[label_id, slider_id, knob_id] {
             layout_engine.set_node(LayoutNode {
                 id,
                 margin,
@@ -161,37 +169,19 @@ impl GainEditor {
 
         let layout = layout_engine.compute(&tree, constraints);
 
-        let mut animation_controller = AnimationController::<f32>::new();
-        let peak_meter_id = animation_controller.start(
-            Animation::new(0.0_f32, 1.0_f32, Duration::from_millis(750))
-                .with_curve(AnimationCurve::EaseInOut),
-        );
-
         let mut registry = ResourceRegistry::new();
         EMBEDDED.register_with(&mut registry);
-        let knob_handle = registry
-            .load::<SvgImage>(ResourceId::from_bytes_le(b"knob.svg"))
-            .expect("knob.svg must be embedded");
         let logo_handle = registry
             .load::<PngImage>(ResourceId::from_bytes_le(b"logo.png"))
             .expect("logo.png must be embedded");
 
         // `ResourceHandle` only allows shared access to the cached decode, so
-        // rasterize standalone copies once here to populate the platform
+        // rasterize a standalone copy once here to populate the platform
         // image registry (CGImage / ID2D1Bitmap source bytes).
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         let mut image_registry = ImageRegistry::new();
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         {
-            let knob_bytes = EMBEDDED
-                .get(ResourceId::from_bytes_le(b"knob.svg"))
-                .expect("knob.svg must be embedded");
-            let mut knob_svg = SvgImage::decode(knob_bytes).expect("knob.svg should decode");
-            let (width, height, rgba) = knob_svg
-                .render_rgba((knob_svg.width(), knob_svg.height()))
-                .expect("knob.svg should rasterize");
-            image_registry.register_rgba(ImageId(1), width, height, &rgba);
-
             let logo_bytes = EMBEDDED
                 .get(ResourceId::from_bytes_le(b"logo.png"))
                 .expect("logo.png must be embedded");
@@ -219,13 +209,11 @@ impl GainEditor {
             layout_engine,
             layout,
             gateway,
-            commands: CommandList::with_capacity(32),
-            animation_controller,
-            peak_meter_id,
-            peak_meter_value: 0.0,
-            peak_meter_direction: true,
+            meter,
+            meter_value: 0.0,
             last_frame: None,
-            knob_handle,
+            mouse_capture: None,
+            commands: CommandList::with_capacity(32),
             logo_handle,
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             image_registry,
@@ -236,10 +224,28 @@ impl GainEditor {
             accessibility_handle: None,
             _panel: root,
             _label: label_id,
-            _slider: slider_id,
+            slider_id,
+            knob_id,
         };
         editor.apply_layout();
         editor
+    }
+
+    /// Pushes `value` into both the slider and the knob, so whichever one
+    /// the user isn't currently dragging still reflects the current gain.
+    fn sync_widget_values(&mut self, value: NormalizedValue) {
+        if let Some(node) = self.tree.find(self.slider_id) {
+            let widget = node.widget.borrow();
+            if let Some(slider) = downcast_widget_ref::<Slider>(&**widget) {
+                slider.set_value(value);
+            }
+        }
+        if let Some(node) = self.tree.find(self.knob_id) {
+            let widget = node.widget.borrow();
+            if let Some(knob) = downcast_widget_ref::<Knob>(&**widget) {
+                knob.set_value(value);
+            }
+        }
     }
 
     fn apply_layout(&mut self) {
@@ -255,6 +261,8 @@ impl GainEditor {
                 label.set_frame(frame);
             } else if let Some(slider) = downcast_widget_ref::<Slider>(&**widget) {
                 slider.set_frame(frame);
+            } else if let Some(knob) = downcast_widget_ref::<Knob>(&**widget) {
+                knob.set_frame(frame);
             }
         }
 
@@ -288,7 +296,11 @@ impl GainEditor {
         self.draw_assets();
     }
 
-    fn update_animation(&mut self) {
+    /// Reads the real peak level `PeakMeter` last had written into it from
+    /// the audio callback, and applies a simple decay so the bar doesn't
+    /// snap straight back to whatever the next-read value is between UI
+    /// ticks (standard peak-meter ballistics: instant attack, timed decay).
+    fn update_meter(&mut self) {
         let now = Instant::now();
         let dt = self
             .last_frame
@@ -296,31 +308,10 @@ impl GainEditor {
             .unwrap_or(Duration::from_millis(16));
         self.last_frame = Some(now);
 
-        let mut peak_value = self.peak_meter_value;
-        let mut completed = false;
-        self.animation_controller.tick(dt, |event| match event {
-            AnimationEvent::Value { value, .. } => {
-                peak_value = value;
-            }
-            AnimationEvent::Completed { value, .. } => {
-                peak_value = value;
-                completed = true;
-            }
-        });
-        self.peak_meter_value = peak_value;
-
-        if completed {
-            let (from, to) = if self.peak_meter_direction {
-                (1.0_f32, 0.0_f32)
-            } else {
-                (0.0_f32, 1.0_f32)
-            };
-            self.peak_meter_id = self.animation_controller.start(
-                Animation::new(from, to, Duration::from_millis(750))
-                    .with_curve(AnimationCurve::EaseInOut),
-            );
-            self.peak_meter_direction = !self.peak_meter_direction;
-        }
+        let level = self.meter.read().clamp(0.0, 1.0);
+        const DECAY_PER_SECOND: f32 = 2.5;
+        let decayed = self.meter_value - DECAY_PER_SECOND * dt.as_secs_f32();
+        self.meter_value = level.max(decayed).max(0.0);
     }
 
     fn draw_peak_meter(&mut self) {
@@ -334,7 +325,7 @@ impl GainEditor {
             color: Color::from_rgb(40, 40, 40),
         });
 
-        let bar_height = meter_height * self.peak_meter_value;
+        let bar_height = meter_height * self.meter_value;
         self.commands.push(PaintCommand::FillRect {
             rect: Rectf::new(
                 Pointf::new(x, y + meter_height - bar_height),
@@ -354,7 +345,7 @@ impl GainEditor {
     /// changes, avoiding a fresh `TextLayout` every frame.
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     fn update_meter_text(&mut self) {
-        let percent = (self.peak_meter_value * 100.0).round() as i32;
+        let percent = (self.meter_value * 100.0).round() as i32;
         if percent == self.last_meter_percent {
             return;
         }
@@ -366,19 +357,11 @@ impl GainEditor {
     }
 
     fn draw_assets(&mut self) {
-        let knob_size = Sizef::new(
-            self.knob_handle.width() as f32,
-            self.knob_handle.height() as f32,
-        );
         let logo_size = Sizef::new(
             self.logo_handle.width() as f32,
             self.logo_handle.height() as f32,
         );
 
-        self.commands.push(PaintCommand::DrawImage {
-            rect: Rectf::new(Pointf::new(20.0, 80.0), knob_size),
-            image: ImageId(1),
-        });
         self.commands.push(PaintCommand::DrawImage {
             rect: Rectf::new(Pointf::new(20.0, 20.0), logo_size),
             image: ImageId(2),
@@ -389,7 +372,40 @@ impl GainEditor {
 impl PluginEditor for GainEditor {
     fn open(&mut self, parent: ParentWindowHandle, _host: &dyn EditorHost) {
         match parent {
-            ParentWindowHandle::Mac(view) | ParentWindowHandle::Windows(view) => {
+            ParentWindowHandle::Mac(view) => {
+                // Attach our own child `NSView` (with a real `drawRect:`
+                // override) instead of drawing directly into the
+                // host-provided view via `lockFocus`; see
+                // `gui_mac::paint_view` for why.
+                #[cfg(target_os = "macos")]
+                {
+                    self.view = gui_mac::attach_paint_view(view, self.size).unwrap_or(view);
+
+                    let editor_ptr: *mut GainEditor = self;
+                    // SAFETY: `editor_ptr` is only ever dereferenced
+                    // synchronously, from AppKit's main-thread dispatch of
+                    // `mouseDown:`/`mouseDragged:`/`mouseUp:` on the
+                    // `GuiPaintView` just attached above, and never again
+                    // once `close()` clears the sink below.
+                    gui_mac::set_input_sink(
+                        self.view,
+                        Box::new(move |event| {
+                            let editor = unsafe { &mut *editor_ptr };
+                            match event {
+                                Event::MouseDown(e) => editor.on_mouse_down(&e),
+                                Event::MouseUp(e) => editor.on_mouse_up(&e),
+                                Event::MouseMove(e) => editor.on_mouse_move(&e),
+                                _ => EventResponse::Bubble,
+                            }
+                        }),
+                    );
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    self.view = view;
+                }
+            }
+            ParentWindowHandle::Windows(view) => {
                 self.view = view;
             }
         }
@@ -407,10 +423,13 @@ impl PluginEditor for GainEditor {
         };
         self.layout = self.layout_engine.compute(&self.tree, constraints);
         self.apply_layout();
+
+        #[cfg(target_os = "macos")]
+        gui_mac::resize_paint_view(self.view, size);
     }
 
     fn idle(&mut self) {
-        self.update_animation();
+        self.update_meter();
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         self.update_meter_text();
         self.rebuild_commands();
@@ -421,7 +440,7 @@ impl PluginEditor for GainEditor {
 
         #[cfg(target_os = "macos")]
         {
-            let _ = gui_mac::render_to_view_with_registries(
+            let _ = gui_mac::update_paint_view(
                 view,
                 size,
                 1.0,
@@ -444,73 +463,82 @@ impl PluginEditor for GainEditor {
         }
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) {
+        #[cfg(target_os = "macos")]
+        gui_mac::clear_input_sink(self.view);
+    }
 
-    fn on_parameter_changed(&mut self, _id: ParameterId, _value: NormalizedValue) {}
+    fn on_parameter_changed(&mut self, id: ParameterId, value: NormalizedValue) {
+        if id == GAIN_PARAM {
+            self.sync_widget_values(value);
+        }
+    }
 
     fn size_constraints(&self) -> SizeConstraints {
         SizeConstraints::default()
     }
-}
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-fn main() {
-    let mut duration_ms = 1000;
-    let mut width = 400;
-    let mut height = 300;
-
-    let mut args = std::env::args().skip(1);
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--duration-ms" => {
-                duration_ms = args
-                    .next()
-                    .expect("--duration-ms requires a value")
-                    .parse()
-                    .expect("duration must be a number");
+    fn on_mouse_down(&mut self, event: &MouseEvent) -> EventResponse {
+        let mut dispatcher = EventDispatcher::new(&self.tree, &self.layout);
+        let target = dispatcher.hit_test(event.position);
+        let response = dispatcher.dispatch(Event::MouseDown(event.clone()));
+        if response == EventResponse::Handled {
+            self.mouse_capture = target;
+            if let Some(value) = self.gateway.get_normalized(GAIN_PARAM) {
+                self.sync_widget_values(value);
             }
-            "--width" => {
-                width = args
-                    .next()
-                    .expect("--width requires a value")
-                    .parse()
-                    .expect("width must be a number");
-            }
-            "--height" => {
-                height = args
-                    .next()
-                    .expect("--height requires a value")
-                    .parse()
-                    .expect("height must be a number");
-            }
-            "--test-host" => {}
-            other => eprintln!("warning: unknown argument {other}"),
         }
+        response
     }
 
-    gui_test_host::run_test_host_with_editor(duration_ms, width, height, GainEditor::new());
-}
+    fn on_mouse_move(&mut self, event: &PointerEvent) -> EventResponse {
+        // Only dispatch while dragging a captured widget: `Slider`/`Knob`
+        // apply their new value unconditionally in `on_mouse_move`, so
+        // dispatching on mere hover (no capture) would change the gain
+        // just by moving the cursor over the control.
+        if self.mouse_capture.is_none() {
+            return EventResponse::Bubble;
+        }
+        let mut dispatcher = EventDispatcher::new(&self.tree, &self.layout);
+        dispatcher.set_capture(self.mouse_capture);
+        let response = dispatcher.dispatch(Event::MouseMove(event.clone()));
+        if response == EventResponse::Handled {
+            if let Some(value) = self.gateway.get_normalized(GAIN_PARAM) {
+                self.sync_widget_values(value);
+            }
+        }
+        response
+    }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn main() {
-    println!("This example is only supported on macOS and Windows.");
+    fn on_mouse_up(&mut self, event: &MouseEvent) -> EventResponse {
+        let mut dispatcher = EventDispatcher::new(&self.tree, &self.layout);
+        dispatcher.set_capture(self.mouse_capture);
+        let response = dispatcher.dispatch(Event::MouseUp(event.clone()));
+        self.mouse_capture = None;
+        response
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
-    use std::time::Duration;
+    use std::sync::Arc;
 
     use gui_core::{
-        Animation, AnimationController, AnimationCurve, AnimationEvent, Event, EventDispatcher,
-        EventResponse, LayoutConstraints, LayoutEngine, LayoutNode, Modifiers, MouseButton,
-        MouseEvent, Pointf, Rectf, Tree, Widget,
+        Event, EventDispatcher, EventResponse, LayoutConstraints, LayoutEngine, LayoutNode,
+        Modifiers, MouseButton, MouseEvent, Pointf, Rectf, Tree, Widget,
     };
-    use gui_host::{NormalizedValue, ParameterId};
+    use gui_host::{
+        LockFreeParameterGateway, NormalizedValue, ParameterId, PeakMeter, PluginEditor,
+    };
     use gui_widgets::{Slider, Theme};
 
     use super::GainEditor;
+
+    fn test_gateway() -> Arc<LockFreeParameterGateway> {
+        Arc::new(LockFreeParameterGateway::default())
+    }
 
     #[test]
     fn slider_mouse_down_invokes_parameter_callback() {
@@ -563,36 +591,8 @@ mod tests {
     }
 
     #[test]
-    fn peak_meter_animation_updates_across_two_frames() {
-        let mut controller = AnimationController::<f32>::new();
-        let _id = controller.start(
-            Animation::new(0.0_f32, 1.0_f32, Duration::from_millis(1500))
-                .with_curve(AnimationCurve::EaseInOut),
-        );
-
-        let mut first_value = 0.0_f32;
-        controller.tick(Duration::from_millis(16), |event| {
-            if let AnimationEvent::Value { value, .. } = event {
-                first_value = value;
-            }
-        });
-
-        let mut second_value = first_value;
-        controller.tick(Duration::from_millis(16), |event| {
-            if let AnimationEvent::Value { value, .. } = event {
-                second_value = value;
-            }
-        });
-
-        assert!(
-            second_value > first_value,
-            "animation should advance between two frames"
-        );
-    }
-
-    #[test]
     fn rebuild_commands_retains_capacity() {
-        let mut editor = GainEditor::new();
+        let mut editor = GainEditor::new(test_gateway(), PeakMeter::new());
         editor.rebuild_commands();
         let first_capacity = editor.commands.capacity();
         editor.rebuild_commands();
@@ -601,5 +601,64 @@ mod tests {
             first_capacity, second_capacity,
             "rebuild_commands should not reallocate across frames"
         );
+    }
+
+    #[test]
+    fn slider_changes_flow_through_shared_gateway() {
+        use gui_host::ParameterGateway;
+
+        let gateway = test_gateway();
+        let _editor = GainEditor::new(gateway.clone(), PeakMeter::new());
+
+        gateway.set_normalized(ParameterId(1), NormalizedValue::new(0.25));
+        assert_eq!(
+            gateway.get_normalized(ParameterId(1)),
+            Some(NormalizedValue::new(0.25))
+        );
+    }
+
+    #[test]
+    fn update_meter_reflects_real_peak_meter_value() {
+        let meter = PeakMeter::new();
+        let mut editor = GainEditor::new(test_gateway(), meter.clone());
+
+        meter.write(0.8);
+        editor.update_meter();
+        assert!(
+            editor.meter_value > 0.0,
+            "meter should pick up the real level written from the audio thread"
+        );
+    }
+
+    #[test]
+    fn on_mouse_down_on_slider_updates_gain_and_syncs_knob() {
+        use gui_host::ParameterGateway;
+
+        let gateway = test_gateway();
+        let mut editor = GainEditor::new(gateway.clone(), PeakMeter::new());
+        editor.resize(gui_core::Sizef::new(400.0, 300.0));
+
+        let slider_box = editor.layout.get(editor.slider_id).unwrap();
+        let position = Pointf::new(
+            slider_box.origin.x + slider_box.size.width * 0.25,
+            slider_box.origin.y + slider_box.size.height / 2.0,
+        );
+
+        let response = editor.on_mouse_down(&MouseEvent {
+            button: MouseButton::Left,
+            position,
+            modifiers: Modifiers::default(),
+            click_count: 1,
+        });
+
+        assert_eq!(response, EventResponse::Handled);
+        let value = gateway
+            .get_normalized(crate::processor::GAIN_PARAM)
+            .expect("slider drag should have written the gain parameter");
+
+        let knob_node = editor.tree.find(editor.knob_id).unwrap();
+        let widget = knob_node.widget.borrow();
+        let knob = gui_core::downcast_widget_ref::<gui_widgets::Knob>(&**widget).unwrap();
+        assert_eq!(knob.value(), value, "knob should mirror the slider's value");
     }
 }

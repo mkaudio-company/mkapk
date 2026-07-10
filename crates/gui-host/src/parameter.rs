@@ -18,6 +18,7 @@ impl NormalizedValue {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ParameterInfo {
     pub id: ParameterId,
     pub name: &'static str,

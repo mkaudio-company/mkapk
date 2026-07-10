@@ -10,20 +10,8 @@ license.workspace = true
 gui-core = { workspace = true }
 gui-host = { workspace = true }
 vst3-sys = { git = "https://github.com/RustAudio/vst3-sys", optional = true }
+vst3-com = { git = "https://github.com/RustAudio/vst3-sys", optional = true }
 
 [features]
 default = ["vst3"]
-vst3 = ["dep:vst3-sys"]
-
-[dev-dependencies]
-gui-host = { workspace = true }
-gui-res = { workspace = true }
-gui-widgets = { workspace = true }
-
-[target.'cfg(target_os = "macos")'.dev-dependencies]
-gui-mac = { workspace = true }
-gui-test-host = { workspace = true }
-
-[target.'cfg(target_os = "windows")'.dev-dependencies]
-gui-win32 = { workspace = true }
-gui-test-host = { workspace = true }
+vst3 = ["dep:vst3-sys", "dep:vst3-com"]

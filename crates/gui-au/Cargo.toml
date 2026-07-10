@@ -15,11 +15,10 @@ gui-core = { workspace = true }
 gui-host = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+au-sys = "0.1.1"
 cocoa = "0.26.1"
 objc = "0.2.7"
 core-foundation = "0.10.0"
 
 [dev-dependencies]
-gui-mac = { workspace = true }
-gui-test-host = { workspace = true }
 gui-widgets = { workspace = true }

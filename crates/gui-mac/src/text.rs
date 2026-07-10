@@ -20,6 +20,7 @@ use core_text::line::CTLine;
 use core_text::string_attributes::kCTFontAttributeName;
 
 #[cfg(target_os = "macos")]
+#[derive(Clone)]
 pub struct TextLayout {
     line: CTLine,
     #[allow(dead_code)]
@@ -95,7 +96,7 @@ impl TextLayout {
 /// Maps `TextLayoutId`s to prepared text layouts so the render backend can
 /// draw `PaintCommand::DrawText` commands.
 #[cfg(target_os = "macos")]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct TextRegistry {
     layouts: std::collections::BTreeMap<u32, TextLayout>,
 }
@@ -124,7 +125,7 @@ impl TextRegistry {
 }
 
 #[cfg(not(target_os = "macos"))]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct TextRegistry {
     _private: (),
 }

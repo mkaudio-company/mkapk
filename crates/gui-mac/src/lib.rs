@@ -20,6 +20,12 @@ pub use text::{TextLayout, TextRegistry};
 pub mod window;
 pub use window::MacWindow;
 
+pub mod paint_view;
+pub use paint_view::{
+    InputSink, attach_paint_view, clear_input_sink, resize_paint_view, set_input_sink,
+    update_paint_view,
+};
+
 pub mod accessibility;
 pub use accessibility::{AccessibilityElementHandle, attach_to_view, build_accessibility_tree};
 

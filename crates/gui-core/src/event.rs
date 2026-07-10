@@ -137,7 +137,13 @@ impl<'a> EventDispatcher<'a> {
         EventResponse::Bubble
     }
 
-    fn hit_test(&self, point: Pointf) -> Option<WidgetId> {
+    /// Finds the deepest widget whose layout box contains `point`, in the
+    /// same top-left-origin space `LayoutResult` uses. Exposed so callers
+    /// that need to track their own mouse-capture target across separate
+    /// `EventDispatcher` instances (one per event, since it borrows the
+    /// tree/layout) can find the widget a `MouseDown` landed on without
+    /// duplicating hit-testing logic.
+    pub fn hit_test(&self, point: Pointf) -> Option<WidgetId> {
         let root = self.tree.root()?;
         self.hit_test_node(root, point)
     }

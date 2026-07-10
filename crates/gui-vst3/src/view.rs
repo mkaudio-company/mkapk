@@ -1,6 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::ffi::{CStr, c_void};
 use std::mem;
+use std::rc::Rc;
 
 use gui_host::{EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor};
 use vst3_sys as vst3_com;
@@ -9,12 +10,21 @@ use vst3_sys::VstPtr;
 use vst3_sys::base::{FIDString, kInvalidArgument, kResultFalse, kResultOk, tresult};
 use vst3_sys::gui::{IPlugFrame, IPlugView, ViewRect};
 use vst3_sys::utils::SharedVstPtr;
+use vst3_sys::vst::IComponentHandler;
+
+/// Shared with the owning `IEditController`, so the view can forward
+/// UI-originated parameter edits to the host via `IComponentHandler`
+/// (`begin_edit`/`perform_edit`/`end_edit`), which is how the host learns
+/// about automation and can round-trip the new value to the audio
+/// processor. `None` outside a VST3 host (e.g. the DAW-less test host).
+pub type ComponentHandlerCell = Rc<RefCell<Option<VstPtr<dyn IComponentHandler>>>>;
 
 #[VST3(implements(IPlugView))]
 pub struct PluginView {
     editor: RefCell<Box<dyn PluginEditor>>,
     frame: RefCell<Option<VstPtr<dyn IPlugFrame>>>,
     size: Cell<gui_core::Sizef>,
+    component_handler: ComponentHandlerCell,
 }
 
 impl PluginView {
@@ -23,6 +33,22 @@ impl PluginView {
             RefCell::new(editor),
             RefCell::new(None),
             Cell::new(gui_core::Sizef::new(400.0, 300.0)),
+            Rc::new(RefCell::new(None)),
+        )
+    }
+
+    /// Like `new`, but forwards parameter edits to `component_handler` (set
+    /// by the owning `IEditController::set_component_handler`) instead of
+    /// silently dropping them.
+    pub fn with_component_handler(
+        editor: Box<dyn PluginEditor>,
+        component_handler: ComponentHandlerCell,
+    ) -> Box<Self> {
+        Self::allocate(
+            RefCell::new(editor),
+            RefCell::new(None),
+            Cell::new(gui_core::Sizef::new(400.0, 300.0)),
+            component_handler,
         )
     }
 }
@@ -90,6 +116,7 @@ impl IPlugView for PluginView {
         let host = ViewHost {
             frame: self.frame.borrow().clone(),
             view: self as *const _ as *mut c_void,
+            component_handler: self.component_handler.clone(),
         };
         self.editor.borrow_mut().open(handle, &host);
 
@@ -184,6 +211,7 @@ impl IPlugView for PluginView {
 struct ViewHost {
     frame: Option<VstPtr<dyn IPlugFrame>>,
     view: *mut c_void,
+    component_handler: ComponentHandlerCell,
 }
 
 impl EditorHost for ViewHost {
@@ -202,9 +230,29 @@ impl EditorHost for ViewHost {
         }
     }
 
-    fn start_parameter_gesture(&self, _id: ParameterId) {}
-    fn end_parameter_gesture(&self, _id: ParameterId) {}
-    fn set_parameter_normalized(&self, _id: ParameterId, _value: NormalizedValue) {}
+    fn start_parameter_gesture(&self, id: ParameterId) {
+        if let Some(handler) = self.component_handler.borrow().as_ref() {
+            unsafe {
+                handler.begin_edit(id.0);
+            }
+        }
+    }
+
+    fn end_parameter_gesture(&self, id: ParameterId) {
+        if let Some(handler) = self.component_handler.borrow().as_ref() {
+            unsafe {
+                handler.end_edit(id.0);
+            }
+        }
+    }
+
+    fn set_parameter_normalized(&self, id: ParameterId, value: NormalizedValue) {
+        if let Some(handler) = self.component_handler.borrow().as_ref() {
+            unsafe {
+                handler.perform_edit(id.0, value.get());
+            }
+        }
+    }
 }
 
 #[cfg(test)]

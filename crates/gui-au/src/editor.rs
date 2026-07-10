@@ -32,6 +32,15 @@ pub struct AuCocoaViewInfo {
     pub view_class: *const c_void,
 }
 
+/// Name of the `NSObject` subclass registered as the `AUCocoaUIBase`
+/// factory (see `mod macos`'s `ui_view_for_audio_unit_with_size`), reported
+/// to real hosts via `kAudioUnitProperty_CocoaUI` (`component.rs`'s
+/// `build_cocoa_view_info`). Distinct from `GuiAuView` (`VIEW_CLASS_NAME`
+/// below), which is the actual content view the factory creates and
+/// returns -- the factory object itself is never shown.
+#[cfg(target_os = "macos")]
+pub(crate) const FACTORY_CLASS_NAME: &str = "GuiAuViewFactory";
+
 #[cfg(target_os = "macos")]
 mod macos {
     #![allow(deprecated)]
@@ -42,9 +51,10 @@ mod macos {
     use gui_core::Sizef;
     use gui_host::{EditorHost, NormalizedValue, ParameterId, ParentWindowHandle};
     use objc::declare::ClassDecl;
-    use objc::runtime::{Class, Object, Sel};
+    use objc::runtime::{Class, Object, Protocol, Sel};
     use objc::{class, msg_send, sel};
     use std::cell::RefCell;
+    use std::mem;
     use std::sync::Once;
 
     const VIEW_CLASS_NAME: &str = "GuiAuView";
@@ -164,6 +174,100 @@ mod macos {
         }
     }
 
+    // `AudioUnitGetProperty` is exported by the AudioToolbox framework
+    // itself (this is the *real*, host-callable entry point -- calling it
+    // routes through the Component Manager to whichever AU instance
+    // `audio_unit` names, which in turn calls back into our own
+    // `component::au_get_property`). Explicit linking is required under
+    // macOS's default two-level-namespace dylib linking, even though the
+    // host process will already have AudioToolbox loaded.
+    #[link(name = "AudioToolbox", kind = "framework")]
+    unsafe extern "C" {
+        fn AudioUnitGetProperty(
+            in_unit: au_sys::AudioUnit,
+            in_id: au_sys::AudioUnitPropertyID,
+            in_scope: au_sys::AudioUnitScope,
+            in_element: au_sys::AudioUnitElement,
+            out_data: *mut c_void,
+            io_data_size: *mut au_sys::UInt32,
+        ) -> au_sys::OSStatus;
+    }
+
+    /// The `AUCocoaUIBase` factory method a real host calls (after
+    /// instantiating `GuiAuViewFactory` via `NSClassFromString`) to obtain
+    /// the plugin's custom UI. Recovers this AU instance's Rust-side state
+    /// from the opaque `audio_unit` handle via a private property (see
+    /// `component::K_GUI_HOST_STATE_PROPERTY`), builds the `PluginEditor`
+    /// from its stored factory closure, and hands off to the same
+    /// `create_au_view` the direct-from-Rust path (`AuEditor::create_view`)
+    /// already uses.
+    // `objc::Encode` isn't implemented for `au_sys::AudioUnit`'s named
+    // opaque pointee type, only for generic pointers, so the registered
+    // method signature uses `*mut c_void` (identical ABI) and casts to
+    // `au_sys::AudioUnit` before calling back into AudioToolbox.
+    extern "C" fn ui_view_for_audio_unit_with_size(
+        _this: &Object,
+        _cmd: Sel,
+        audio_unit: *mut c_void,
+        preferred_size: NSSize,
+    ) -> *mut Object {
+        unsafe {
+            let mut instance_ptr: *mut c_void = ptr::null_mut();
+            let mut size: au_sys::UInt32 = mem::size_of::<*mut c_void>() as u32;
+            let status = AudioUnitGetProperty(
+                audio_unit as au_sys::AudioUnit,
+                crate::component::K_GUI_HOST_STATE_PROPERTY,
+                au_sys::kAudioUnitScope_Global,
+                0,
+                &mut instance_ptr as *mut *mut c_void as *mut c_void,
+                &mut size,
+            );
+            if status != au_sys::noErr || instance_ptr.is_null() {
+                return nil;
+            }
+            let Some(editor) = crate::component::build_editor(instance_ptr) else {
+                return nil;
+            };
+            create_au_view(editor, preferred_size.width, preferred_size.height) as *mut Object
+        }
+    }
+
+    static REGISTER_FACTORY_CLASS: Once = Once::new();
+    static mut FACTORY_CLASS: *const Class = ptr::null();
+
+    fn factory_class() -> &'static Class {
+        unsafe {
+            REGISTER_FACTORY_CLASS.call_once(|| {
+                let superclass = class!(NSObject);
+                let mut decl = ClassDecl::new(super::FACTORY_CLASS_NAME, superclass)
+                    .expect("GuiAuViewFactory class should register exactly once");
+                let imp: extern "C" fn(&Object, Sel, *mut c_void, NSSize) -> *mut Object =
+                    ui_view_for_audio_unit_with_size;
+                decl.add_method(sel!(uiViewForAudioUnit:withSize:), imp);
+                // `AUCocoaUIBase` is an informal protocol (hosts are meant
+                // to check `respondsToSelector:`), but some hosts also
+                // check `conformsToProtocol:`; declare it when the runtime
+                // already knows about it (it will, once AudioUnit-related
+                // frameworks are loaded, which every real AU host does
+                // before loading us).
+                if let Some(proto) = Protocol::get("AUCocoaUIBase") {
+                    decl.add_protocol(proto);
+                }
+                FACTORY_CLASS = decl.register();
+            });
+            &*FACTORY_CLASS
+        }
+    }
+
+    /// Registers the `AUCocoaUIBase` factory class ahead of time. Not
+    /// strictly required (the class also lazily registers itself the first
+    /// time `kAudioUnitProperty_CocoaUI` is queried), but calling this once
+    /// during plugin load avoids doing class registration work on whatever
+    /// thread first happens to query that property.
+    pub fn ensure_factory_class_registered() {
+        let _ = factory_class();
+    }
+
     pub fn create_au_view(editor: Box<dyn PluginEditor>, width: f64, height: f64) -> *mut c_void {
         unsafe {
             let cls = au_view_class();
@@ -204,7 +308,7 @@ mod macos {
 }
 
 #[cfg(target_os = "macos")]
-pub use macos::{create_au_view, get_cocoa_view_info};
+pub use macos::{create_au_view, ensure_factory_class_registered, get_cocoa_view_info};
 
 #[cfg(not(target_os = "macos"))]
 pub fn create_au_view(_editor: Box<dyn PluginEditor>, _width: f64, _height: f64) -> *mut c_void {

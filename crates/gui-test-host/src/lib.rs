@@ -7,12 +7,43 @@
 extern crate objc;
 
 use gui_core::Sizef;
+#[cfg(target_os = "windows")]
+use gui_core::{Event, EventResponse};
 use gui_host::{
     EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor, SizeConstraints,
 };
 
 pub mod platform;
 pub use platform::{PlatformWindow, create_host_window};
+
+/// Wires a `PlatformWindow`'s real mouse input through to `editor`. Only
+/// meaningful on Windows: `PlatformWindow::set_input_sink` hooks the one
+/// `wndproc` this crate owns, since a real Win32 host or DAW's window isn't
+/// ours to subclass. On macOS, the editor's own view (see
+/// `gui_mac::paint_view`) wires mouse handling directly during `open()`
+/// instead, so this is a no-op there.
+///
+/// # Safety invariant
+/// `editor` must outlive every future `window.pump_events()` call (the
+/// sink dereferences a raw pointer back to it); call `window.destroy()`
+/// (which clears the sink via `WM_NCDESTROY`) before dropping `editor`.
+#[cfg(target_os = "windows")]
+pub fn attach_mouse_input<E: PluginEditor + 'static>(window: &PlatformWindow, editor: &mut E) {
+    let editor_ptr: *mut E = editor;
+    window.set_input_sink(Box::new(move |event| {
+        // SAFETY: see the function-level safety invariant above.
+        let editor = unsafe { &mut *editor_ptr };
+        match event {
+            Event::MouseDown(e) => editor.on_mouse_down(&e),
+            Event::MouseUp(e) => editor.on_mouse_up(&e),
+            Event::MouseMove(e) => editor.on_mouse_move(&e),
+            _ => EventResponse::Bubble,
+        }
+    }));
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn attach_mouse_input<E: PluginEditor>(_window: &PlatformWindow, _editor: &mut E) {}
 
 pub struct BlankEditor;
 

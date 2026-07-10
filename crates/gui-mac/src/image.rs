@@ -22,7 +22,7 @@ use core_graphics::image::{CGImage, CGImageAlphaInfo};
 /// `SvgImage::render_rgba()` (already premultiplied, since `tiny-skia`
 /// stores pixels premultiplied internally).
 #[cfg(target_os = "macos")]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ImageRegistry {
     images: BTreeMap<u32, CGImage>,
 }
@@ -69,7 +69,7 @@ impl ImageRegistry {
 }
 
 #[cfg(not(target_os = "macos"))]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ImageRegistry {
     _private: (),
 }

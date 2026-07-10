@@ -7,6 +7,23 @@ pub trait PluginEditor {
     fn idle(&mut self);
     fn on_parameter_changed(&mut self, id: ParameterId, value: NormalizedValue);
     fn size_constraints(&self) -> SizeConstraints;
+
+    /// Real mouse input, forwarded by the platform windowing code (see
+    /// `gui-mac`'s `GuiPaintView` and `gui-test-host`'s Win32 window) once an
+    /// OS event actually lands on the editor's view. Default no-ops so
+    /// existing/test editors that don't need interactivity don't have to
+    /// implement these.
+    fn on_mouse_down(&mut self, _event: &gui_core::MouseEvent) -> gui_core::EventResponse {
+        gui_core::EventResponse::Bubble
+    }
+
+    fn on_mouse_up(&mut self, _event: &gui_core::MouseEvent) -> gui_core::EventResponse {
+        gui_core::EventResponse::Bubble
+    }
+
+    fn on_mouse_move(&mut self, _event: &gui_core::PointerEvent) -> gui_core::EventResponse {
+        gui_core::EventResponse::Bubble
+    }
 }
 
 pub trait EditorHost {

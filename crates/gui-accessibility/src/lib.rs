@@ -59,12 +59,12 @@ impl AccessibilityBackend for WinBackend {
 pub fn default_backend() -> Box<dyn AccessibilityBackend> {
     #[cfg(all(feature = "backend", target_os = "macos"))]
     {
-        return Box::new(MacBackend);
+        Box::new(MacBackend)
     }
 
     #[cfg(all(feature = "backend", target_os = "windows"))]
     {
-        return Box::new(WinBackend);
+        Box::new(WinBackend)
     }
 
     #[cfg(not(feature = "backend"))]

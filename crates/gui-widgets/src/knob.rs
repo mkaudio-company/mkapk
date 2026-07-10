@@ -108,7 +108,14 @@ impl Widget for Knob {
         });
 
         let value = self.value.get().get() as f32;
-        let start_angle = -3.0 * PI / 4.0;
+        // Rotated 90 degrees left (counterclockwise) from the naive
+        // -135 degree start: without this, the indicator sweeps from
+        // ~10:30 to ~7:30 the long way around through the right side,
+        // leaving the gap at 9 o'clock instead of at the bottom. With the
+        // extra -PI/2, the indicator instead runs from ~7:30 (min) through
+        // 12 o'clock (mid) to ~4:30 (max), the conventional hardware-knob
+        // layout with the gap centered at the bottom.
+        let start_angle = -3.0 * PI / 4.0 - PI / 2.0;
         let sweep = 3.0 * PI / 2.0;
         let angle = start_angle + value * sweep;
         let indicator_distance = radius - INDICATOR_RADIUS - self.theme.border_width;

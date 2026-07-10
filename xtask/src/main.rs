@@ -16,14 +16,43 @@ fn main() -> ExitCode {
     match args[1].as_str() {
         "test" => run_test(),
         "check" => run_check(),
+        "bundle-standalone" => bundle::bundle_standalone(),
         "bundle-vst3" => bundle::bundle_vst3(),
         "bundle-au" => bundle::bundle_au(),
         "bundle-aax" => aax::bundle_aax(),
+        "bundle-all" => run_bundle_all(),
         "validate" => run_validate(),
         other => {
             eprintln!("Unknown command: {}", other);
             ExitCode::from(1)
         }
+    }
+}
+
+/// Runs every `bundle-*` command in turn and prints a PASS/SKIP/FAIL
+/// summary table, so the state of all four plugin formats is visible at a
+/// glance rather than requiring four separate invocations.
+fn run_bundle_all() -> ExitCode {
+    let results = [
+        ("standalone", bundle::bundle_standalone_status()),
+        ("vst3", bundle::bundle_vst3_status()),
+        ("au", bundle::bundle_au_status()),
+        ("aax", aax::bundle_aax_status()),
+    ];
+
+    println!("\n=== bundle-all summary ===");
+    let mut any_failed = false;
+    for (name, status) in &results {
+        if matches!(status, bundle::BundleStatus::Fail(_)) {
+            any_failed = true;
+        }
+        println!("{:<5}  {:<11}  {}", status.label(), name, status.detail());
+    }
+
+    if any_failed {
+        ExitCode::from(1)
+    } else {
+        ExitCode::from(0)
     }
 }
 

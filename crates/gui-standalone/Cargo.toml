@@ -1,0 +1,25 @@
+[package]
+name = "gui-standalone"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+gui-core = { workspace = true }
+gui-host = { workspace = true }
+gui-test-host = { workspace = true }
+cpal = "0.15"
+ringbuf = "0.5"
+
+# Device-picker UI (macOS only for now: mkgraphic's cross-platform Window/App
+# facade doesn't wire up Windows yet as of 0.3.0, even though platform code
+# for it exists in the crate).
+[target.'cfg(target_os = "macos")'.dependencies]
+mkgraphic = "0.3.1"
+cocoa = "0.26.1"
+objc = "0.2.7"
+objc2 = "0.5"
+objc2-foundation = "0.2"
+objc2-app-kit = { version = "0.2", features = ["NSApplication"] }
