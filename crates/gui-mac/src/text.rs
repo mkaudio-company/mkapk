@@ -1,6 +1,6 @@
 #![allow(unexpected_cfgs)]
 
-use gui_core::{Pointf, Sizef};
+use gui_core::{Pointf, Sizef, TextLayoutId};
 
 #[cfg(target_os = "macos")]
 use core_foundation::attributed_string::CFMutableAttributedString;
@@ -90,6 +90,64 @@ impl TextLayout {
     }
 
     pub fn draw(&self, _context: &core::ffi::c_void, _position: Pointf) {}
+}
+
+/// Maps `TextLayoutId`s to prepared text layouts so the render backend can
+/// draw `PaintCommand::DrawText` commands.
+#[cfg(target_os = "macos")]
+#[derive(Default)]
+pub struct TextRegistry {
+    layouts: std::collections::BTreeMap<u32, TextLayout>,
+}
+
+#[cfg(target_os = "macos")]
+impl TextRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert(&mut self, id: TextLayoutId, layout: TextLayout) {
+        self.layouts.insert(id.0, layout);
+    }
+
+    pub fn get(&self, id: TextLayoutId) -> Option<&TextLayout> {
+        self.layouts.get(&id.0)
+    }
+
+    pub fn len(&self) -> usize {
+        self.layouts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.layouts.is_empty()
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[derive(Default)]
+pub struct TextRegistry {
+    _private: (),
+}
+
+#[cfg(not(target_os = "macos"))]
+impl TextRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert(&mut self, _id: TextLayoutId, _layout: TextLayout) {}
+
+    pub fn get(&self, _id: TextLayoutId) -> Option<&TextLayout> {
+        None
+    }
+
+    pub fn len(&self) -> usize {
+        0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

@@ -2,6 +2,10 @@
 use std::env;
 use std::process::{Command, ExitCode};
 
+mod aax;
+mod bundle;
+mod setup;
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
@@ -12,18 +16,9 @@ fn main() -> ExitCode {
     match args[1].as_str() {
         "test" => run_test(),
         "check" => run_check(),
-        "bundle-vst3" => {
-            println!("bundle-vst3 not yet implemented");
-            ExitCode::from(0)
-        }
-        "bundle-au" => {
-            println!("bundle-au not yet implemented");
-            ExitCode::from(0)
-        }
-        "bundle-aax" => {
-            println!("bundle-aax not yet implemented");
-            ExitCode::from(0)
-        }
+        "bundle-vst3" => bundle::bundle_vst3(),
+        "bundle-au" => bundle::bundle_au(),
+        "bundle-aax" => aax::bundle_aax(),
         "validate" => run_validate(),
         other => {
             eprintln!("Unknown command: {}", other);

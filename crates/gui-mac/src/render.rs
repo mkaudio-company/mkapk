@@ -1,6 +1,9 @@
 #![allow(unexpected_cfgs)]
 
-use gui_core::{Color, CommandList, PaintCommand, Pointf, Rectf, RenderBackend, Sizef};
+use gui_core::{CommandList, Pointf, Rectf, RenderBackend, Sizef};
+
+#[cfg(target_os = "macos")]
+use gui_core::{Color, PaintCommand};
 
 #[cfg(target_os = "macos")]
 use core_graphics::base::CGFloat;
@@ -19,26 +22,46 @@ use core_graphics::path::CGPath;
 use foreign_types::ForeignType;
 
 #[cfg(target_os = "macos")]
-pub struct CoreGraphicsRenderBackend {
+pub struct CoreGraphicsRenderBackend<'a> {
     context: CGContext,
     clip: Rectf,
     #[allow(dead_code)]
     scale: f32,
+    images: Option<&'a crate::ImageRegistry>,
+    texts: Option<&'a crate::TextRegistry>,
 }
 
 #[cfg(target_os = "macos")]
-impl CoreGraphicsRenderBackend {
+impl<'a> CoreGraphicsRenderBackend<'a> {
     pub fn new(context: CGContext, clip: Rectf, scale: f32) -> Self {
         Self {
             context,
             clip,
             scale,
+            images: None,
+            texts: None,
+        }
+    }
+
+    pub fn with_registries(
+        context: CGContext,
+        clip: Rectf,
+        scale: f32,
+        images: Option<&'a crate::ImageRegistry>,
+        texts: Option<&'a crate::TextRegistry>,
+    ) -> Self {
+        Self {
+            context,
+            clip,
+            scale,
+            images,
+            texts,
         }
     }
 }
 
 #[cfg(target_os = "macos")]
-impl RenderBackend for CoreGraphicsRenderBackend {
+impl<'a> RenderBackend for CoreGraphicsRenderBackend<'a> {
     fn begin(&mut self, size: Sizef) {
         let ctx = self.context.as_ref();
         ctx.save();
@@ -69,7 +92,7 @@ impl RenderBackend for CoreGraphicsRenderBackend {
 }
 
 #[cfg(target_os = "macos")]
-impl CoreGraphicsRenderBackend {
+impl<'a> CoreGraphicsRenderBackend<'a> {
     fn draw_command(&mut self, command: &PaintCommand) {
         let ctx = self.context.as_ref();
         match *command {
@@ -145,8 +168,34 @@ impl CoreGraphicsRenderBackend {
                 }
                 draw_linear_gradient(ctx, rect, start, end, stops);
             }
-            PaintCommand::DrawImage { .. } => {}
-            PaintCommand::DrawText { .. } => {}
+            PaintCommand::DrawImage { rect, image } => {
+                if let Some(cg_image) = self.images.and_then(|images| images.get(image)) {
+                    // `CGContextDrawImage` draws bottom-up relative to the
+                    // current transform. The context is already globally
+                    // flipped to a top-left origin (see `begin`), so a local
+                    // flip around the destination rect is needed to draw the
+                    // image right-side up.
+                    ctx.save();
+                    ctx.translate(
+                        rect.origin.x as CGFloat,
+                        (rect.origin.y + rect.size.height) as CGFloat,
+                    );
+                    ctx.scale(1.0, -1.0);
+                    ctx.draw_image(
+                        CGRect::new(
+                            &CGPoint::new(0.0, 0.0),
+                            &CGSize::new(rect.size.width as CGFloat, rect.size.height as CGFloat),
+                        ),
+                        cg_image,
+                    );
+                    ctx.restore();
+                }
+            }
+            PaintCommand::DrawText { position, text } => {
+                if let Some(layout) = self.texts.and_then(|texts| texts.get(text)) {
+                    layout.draw(&self.context, position);
+                }
+            }
             PaintCommand::DrawGpuSurface { .. } => {}
         }
     }
@@ -273,6 +322,32 @@ pub fn render_to_view(
     Some(())
 }
 
+/// Like [`render_to_view`], but resolves `DrawImage`/`DrawText` paint
+/// commands against the provided registries.
+#[cfg(target_os = "macos")]
+pub fn render_to_view_with_registries(
+    view: *mut core::ffi::c_void,
+    size: Sizef,
+    scale: f32,
+    commands: &CommandList,
+    images: Option<&crate::ImageRegistry>,
+    texts: Option<&crate::TextRegistry>,
+) -> Option<()> {
+    let (view, cg_context) = lock_view_context(view)?;
+    let mut backend = CoreGraphicsRenderBackend::with_registries(
+        cg_context,
+        Rectf::default(),
+        scale,
+        images,
+        texts,
+    );
+    backend.begin(size);
+    backend.replay(commands);
+    backend.end();
+    unlock_view(view);
+    Some(())
+}
+
 #[cfg(target_os = "macos")]
 pub fn render_text_to_view(
     view: *mut core::ffi::c_void,
@@ -327,7 +402,17 @@ fn lock_view_context(
 
 #[cfg(target_os = "macos")]
 fn unlock_view(view: *mut objc::runtime::Object) {
-    let _: () = unsafe { msg_send![view, unlockFocus] };
+    unsafe {
+        let _: () = msg_send![view, unlockFocus];
+        // `lockFocus`-based immediate drawing writes into the window's
+        // buffered backing store but is not otherwise scheduled for
+        // display; without an explicit flush here the drawn content never
+        // reaches the screen.
+        let window: *mut objc::runtime::Object = msg_send![view, window];
+        if !window.is_null() {
+            let _: () = msg_send![window, flushWindow];
+        }
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -356,6 +441,18 @@ pub fn render_to_view(
 }
 
 #[cfg(not(target_os = "macos"))]
+pub fn render_to_view_with_registries(
+    _view: *mut core::ffi::c_void,
+    _size: Sizef,
+    _scale: f32,
+    _commands: &CommandList,
+    _images: Option<&crate::ImageRegistry>,
+    _texts: Option<&crate::TextRegistry>,
+) -> Option<()> {
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
 pub fn render_text_to_view(
     _view: *mut core::ffi::c_void,
     _size: Sizef,
@@ -373,5 +470,75 @@ mod tests {
     #[test]
     fn core_graphics_render_backend_size() {
         let _ = core::mem::size_of::<CoreGraphicsRenderBackend>();
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn draw_command_writes_expected_pixels_to_offscreen_bitmap() {
+        let width = 8usize;
+        let height = 8usize;
+        let color_space = CGColorSpace::create_device_rgb();
+        let ctx = CGContext::create_bitmap_context(
+            None,
+            width,
+            height,
+            8,
+            width * 4,
+            &color_space,
+            core_graphics::image::CGImageAlphaInfo::CGImageAlphaPremultipliedLast as u32,
+        );
+        let mut readback_ctx = ctx.clone();
+
+        let mut images = crate::ImageRegistry::new();
+        let red_pixels: [u8; 16] = [
+            255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255,
+        ];
+        images.register_rgba(gui_core::ImageId(1), 2, 2, &red_pixels);
+
+        let mut commands = CommandList::new();
+        commands.push(PaintCommand::Clear {
+            color: Color::new(30, 30, 30, 255),
+        });
+        commands.push(PaintCommand::FillRect {
+            rect: Rectf::new(Pointf::new(0.0, 0.0), gui_core::Sizef::new(4.0, 4.0)),
+            color: Color::new(50, 50, 50, 255),
+        });
+        commands.push(PaintCommand::DrawImage {
+            rect: Rectf::new(Pointf::new(4.0, 4.0), gui_core::Sizef::new(4.0, 4.0)),
+            image: gui_core::ImageId(1),
+        });
+
+        let mut backend = CoreGraphicsRenderBackend::with_registries(
+            ctx,
+            Rectf::default(),
+            1.0,
+            Some(&images),
+            None,
+        );
+        backend.begin(Sizef::new(width as f32, height as f32));
+        backend.replay(&commands);
+        backend.end();
+        drop(backend);
+
+        let bytes_per_row = readback_ctx.bytes_per_row();
+        let data = readback_ctx.data();
+
+        let pixel_at = |x: usize, y: usize| -> (u8, u8, u8, u8) {
+            let offset = y * bytes_per_row + x * 4;
+            (
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            )
+        };
+
+        // Top-left: FillRect(50,50,50) should have overwritten Clear(30,30,30).
+        assert_eq!(pixel_at(1, 1), (50, 50, 50, 255));
+        // Bottom-right quadrant: the drawn red image (bitmap row 0 is at the
+        // top since CoreGraphics context memory is top-down for this API).
+        assert_eq!(pixel_at(5, 5), (255, 0, 0, 255));
+        // Untouched region should still show the Clear color.
+        assert_eq!(pixel_at(1, 6), (30, 30, 30, 255));
     }
 }

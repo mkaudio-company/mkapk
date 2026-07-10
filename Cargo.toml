@@ -26,11 +26,11 @@ repository = "https://github.com/mkaudio-company/rust-plugin-gui-framework"
 documentation = "https://docs.rs/rust-plugin-gui-framework"
 
 [workspace.dependencies]
-gui-core = { path = "crates/gui-core" }
-gui-host = { path = "crates/gui-host" }
-gui-res = { path = "crates/gui-res" }
-gui-accessibility = { path = "crates/gui-accessibility" }
-gui-mac = { path = "crates/gui-mac" }
-gui-test-host = { path = "crates/gui-test-host" }
-gui-widgets = { path = "crates/gui-widgets" }
-gui-win32 = { path = "crates/gui-win32" }
+gui-core = { path = "crates/gui-core", version = "0.1.0" }
+gui-host = { path = "crates/gui-host", version = "0.1.0" }
+gui-res = { path = "crates/gui-res", version = "0.1.0" }
+gui-accessibility = { path = "crates/gui-accessibility", version = "0.1.0" }
+gui-mac = { path = "crates/gui-mac", version = "0.1.0" }
+gui-test-host = { path = "crates/gui-test-host", version = "0.1.0" }
+gui-widgets = { path = "crates/gui-widgets", version = "0.1.0" }
+gui-win32 = { path = "crates/gui-win32", version = "0.1.0" }

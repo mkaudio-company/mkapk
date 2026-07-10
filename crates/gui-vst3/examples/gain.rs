@@ -7,17 +7,32 @@ use std::time::{Duration, Instant};
 use gui_core::{
     Animation, AnimationController, AnimationCurve, AnimationEvent, AnimationId, Color,
     CommandList, ImageId, Insetsf, LayoutConstraints, LayoutDirection, LayoutEngine, LayoutNode,
-    LayoutResult, PaintCommand, Pointf, Rectf, Sizef, TraverseOrder, Tree, Widget, WidgetId,
-    downcast_widget_ref,
+    LayoutResult, PaintCommand, Pointf, Rectf, Sizef, TextLayoutId, TraverseOrder, Tree, Widget,
+    WidgetId, downcast_widget_ref,
 };
 use gui_host::{
     EditorHost, LockFreeParameterGateway, NormalizedValue, ParameterGateway, ParameterId,
     ParentWindowHandle, PluginEditor, SizeConstraints,
 };
 use gui_res::{
-    PngImage, ResourceHandle, ResourceId, ResourceRegistry, SvgImage, generated::EMBEDDED,
+    PngImage, Resource, ResourceBundle, ResourceHandle, ResourceId, ResourceRegistry, SvgImage,
+    generated::EMBEDDED,
 };
 use gui_widgets::{Label, Slider, Theme};
+
+#[cfg(target_os = "macos")]
+type ImageRegistry = gui_mac::ImageRegistry;
+#[cfg(target_os = "macos")]
+type TextRegistry = gui_mac::TextRegistry;
+#[cfg(target_os = "macos")]
+type PlatformTextLayout = gui_mac::TextLayout;
+
+#[cfg(target_os = "windows")]
+type ImageRegistry = gui_win32::ImageRegistry;
+#[cfg(target_os = "windows")]
+type TextRegistry = gui_win32::TextRegistry;
+#[cfg(target_os = "windows")]
+type PlatformTextLayout = gui_win32::TextLayout;
 
 struct Panel {
     id: WidgetId,
@@ -72,6 +87,13 @@ struct GainEditor {
     last_frame: Option<Instant>,
     knob_handle: ResourceHandle<SvgImage>,
     logo_handle: ResourceHandle<PngImage>,
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    image_registry: ImageRegistry,
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    text_registry: TextRegistry,
+    last_meter_percent: i32,
+    #[cfg(target_os = "macos")]
+    accessibility_handle: Option<gui_mac::AccessibilityElementHandle>,
     _panel: WidgetId,
     _label: WidgetId,
     _slider: WidgetId,
@@ -154,6 +176,42 @@ impl GainEditor {
             .load::<PngImage>(ResourceId::from_bytes_le(b"logo.png"))
             .expect("logo.png must be embedded");
 
+        // `ResourceHandle` only allows shared access to the cached decode, so
+        // rasterize standalone copies once here to populate the platform
+        // image registry (CGImage / ID2D1Bitmap source bytes).
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        let mut image_registry = ImageRegistry::new();
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        {
+            let knob_bytes = EMBEDDED
+                .get(ResourceId::from_bytes_le(b"knob.svg"))
+                .expect("knob.svg must be embedded");
+            let mut knob_svg = SvgImage::decode(knob_bytes).expect("knob.svg should decode");
+            let (width, height, rgba) = knob_svg
+                .render_rgba((knob_svg.width(), knob_svg.height()))
+                .expect("knob.svg should rasterize");
+            image_registry.register_rgba(ImageId(1), width, height, &rgba);
+
+            let logo_bytes = EMBEDDED
+                .get(ResourceId::from_bytes_le(b"logo.png"))
+                .expect("logo.png must be embedded");
+            let logo_png = PngImage::decode(logo_bytes).expect("logo.png should decode");
+            let premultiplied = logo_png.rgba_premultiplied();
+            image_registry.register_rgba(
+                ImageId(2),
+                logo_png.width(),
+                logo_png.height(),
+                &premultiplied,
+            );
+        }
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        let mut text_registry = TextRegistry::new();
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        text_registry.insert(
+            TextLayoutId(0),
+            PlatformTextLayout::new("Gain", theme.font_size),
+        );
+
         let mut editor = Self {
             view: core::ptr::null_mut(),
             size,
@@ -169,6 +227,13 @@ impl GainEditor {
             last_frame: None,
             knob_handle,
             logo_handle,
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            image_registry,
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            text_registry,
+            last_meter_percent: -1,
+            #[cfg(target_os = "macos")]
+            accessibility_handle: None,
             _panel: root,
             _label: label_id,
             _slider: slider_id,
@@ -192,6 +257,24 @@ impl GainEditor {
                 slider.set_frame(frame);
             }
         }
+
+        self.tree.set_layout_result(self.layout.clone());
+        #[cfg(target_os = "macos")]
+        self.refresh_accessibility();
+    }
+
+    /// Mirrors the current widget accessibility tree into a real
+    /// `NSAccessibilityElement` tree and attaches it to the live view, so
+    /// VoiceOver/Accessibility Inspector can query widget roles/labels/values.
+    #[cfg(target_os = "macos")]
+    fn refresh_accessibility(&mut self) {
+        if self.view.is_null() {
+            return;
+        }
+        let a11y_tree = self.tree.accessibility_tree();
+        let handle = gui_mac::build_accessibility_tree(&a11y_tree);
+        gui_mac::attach_to_view(self.view, &handle);
+        self.accessibility_handle = Some(handle);
     }
 
     fn rebuild_commands(&mut self) {
@@ -259,6 +342,27 @@ impl GainEditor {
             ),
             color: Color::from_rgb(0, 200, 100),
         });
+
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        self.commands.push(PaintCommand::DrawText {
+            position: Pointf::new(x - 12.0, y - 20.0),
+            text: TextLayoutId(1),
+        });
+    }
+
+    /// Rebuilds the peak-meter percentage label only when its rounded value
+    /// changes, avoiding a fresh `TextLayout` every frame.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    fn update_meter_text(&mut self) {
+        let percent = (self.peak_meter_value * 100.0).round() as i32;
+        if percent == self.last_meter_percent {
+            return;
+        }
+        self.last_meter_percent = percent;
+        self.text_registry.insert(
+            TextLayoutId(1),
+            PlatformTextLayout::new(&format!("{percent}%"), 14.0),
+        );
     }
 
     fn draw_assets(&mut self) {
@@ -289,6 +393,8 @@ impl PluginEditor for GainEditor {
                 self.view = view;
             }
         }
+        #[cfg(target_os = "macos")]
+        self.refresh_accessibility();
     }
 
     fn resize(&mut self, size: Sizef) {
@@ -305,6 +411,8 @@ impl PluginEditor for GainEditor {
 
     fn idle(&mut self) {
         self.update_animation();
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        self.update_meter_text();
         self.rebuild_commands();
 
         let view = self.view;
@@ -313,12 +421,26 @@ impl PluginEditor for GainEditor {
 
         #[cfg(target_os = "macos")]
         {
-            let _ = gui_mac::render_to_view(view, size, 1.0, commands);
+            let _ = gui_mac::render_to_view_with_registries(
+                view,
+                size,
+                1.0,
+                commands,
+                Some(&self.image_registry),
+                Some(&self.text_registry),
+            );
         }
 
         #[cfg(target_os = "windows")]
         {
-            let _ = gui_win32::render_to_hwnd(view, size, 1.0, commands);
+            let _ = gui_win32::render_to_hwnd_with_registries(
+                view,
+                size,
+                1.0,
+                commands,
+                Some(&self.image_registry),
+                Some(&self.text_registry),
+            );
         }
     }
 

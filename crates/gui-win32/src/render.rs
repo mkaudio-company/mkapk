@@ -10,15 +10,17 @@ use windows::{
     Win32::Foundation::{HMODULE, HWND},
     Win32::Graphics::Direct2D::{
         Common::{
-            D2D_RECT_F as D2D1_RECT_F, D2D1_ALPHA_MODE_IGNORE, D2D1_COLOR_F,
-            D2D1_FIGURE_BEGIN_FILLED, D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_CLOSED,
-            D2D1_FIGURE_END_OPEN, D2D1_GRADIENT_STOP, D2D1_PIXEL_FORMAT,
+            D2D_RECT_F as D2D1_RECT_F, D2D_SIZE_U, D2D1_ALPHA_MODE_IGNORE,
+            D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_FILLED,
+            D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_CLOSED, D2D1_FIGURE_END_OPEN,
+            D2D1_GRADIENT_STOP, D2D1_PIXEL_FORMAT,
         },
-        D2D1_BITMAP_OPTIONS_CANNOT_DRAW, D2D1_BITMAP_OPTIONS_TARGET, D2D1_BITMAP_PROPERTIES1,
-        D2D1_DEVICE_CONTEXT_OPTIONS_NONE, D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_EXTEND_MODE_CLAMP,
-        D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_GAMMA_2_2, D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES,
-        D2D1_ROUNDED_RECT, D2D1CreateFactory, ID2D1DeviceContext, ID2D1Factory1,
-        ID2D1PathGeometry1, ID2D1RenderTarget, ID2D1SolidColorBrush,
+        D2D1_BITMAP_OPTIONS_CANNOT_DRAW, D2D1_BITMAP_OPTIONS_NONE, D2D1_BITMAP_OPTIONS_TARGET,
+        D2D1_BITMAP_PROPERTIES1, D2D1_DEVICE_CONTEXT_OPTIONS_NONE, D2D1_DRAW_TEXT_OPTIONS_NONE,
+        D2D1_EXTEND_MODE_CLAMP, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_GAMMA_2_2,
+        D2D1_INTERPOLATION_MODE_LINEAR, D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES, D2D1_ROUNDED_RECT,
+        D2D1CreateFactory, ID2D1DeviceContext, ID2D1Factory1, ID2D1PathGeometry1,
+        ID2D1RenderTarget, ID2D1SolidColorBrush,
     },
     Win32::Graphics::Direct3D::{D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP},
     Win32::Graphics::Direct3D11::{
@@ -27,8 +29,8 @@ use windows::{
     Win32::Graphics::DirectWrite::IDWriteTextLayout,
     Win32::Graphics::Dxgi::{
         Common::{
-            DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_UNKNOWN,
-            DXGI_SAMPLE_DESC,
+            DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM,
+            DXGI_FORMAT_UNKNOWN, DXGI_SAMPLE_DESC,
         },
         DXGI_PRESENT, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_CHAIN_FLAG,
         DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL, DXGI_USAGE_RENDER_TARGET_OUTPUT, IDXGIDevice,
@@ -40,7 +42,7 @@ use windows::{
 use windows_numerics::Vector2;
 
 #[cfg(target_os = "windows")]
-pub struct D2DRenderBackend {
+pub struct D2DRenderBackend<'a> {
     factory: ID2D1Factory1,
     context: ID2D1DeviceContext,
     swap_chain: IDXGISwapChain1,
@@ -49,10 +51,12 @@ pub struct D2DRenderBackend {
     solid_brush: ID2D1SolidColorBrush,
     point_buffer: Vec<Vector2>,
     gradient_stop_buffer: Vec<D2D1_GRADIENT_STOP>,
+    images: Option<&'a crate::ImageRegistry>,
+    texts: Option<&'a crate::TextRegistry>,
 }
 
 #[cfg(target_os = "windows")]
-impl D2DRenderBackend {
+impl<'a> D2DRenderBackend<'a> {
     pub fn new(hwnd: HWND) -> Option<Self> {
         unsafe {
             let factory =
@@ -83,12 +87,23 @@ impl D2DRenderBackend {
                 solid_brush,
                 point_buffer: Vec::new(),
                 gradient_stop_buffer: Vec::new(),
+                images: None,
+                texts: None,
             })
         }
     }
 
     pub fn set_scale(&mut self, scale: f32) {
         self.scale = scale;
+    }
+
+    pub fn set_registries(
+        &mut self,
+        images: Option<&'a crate::ImageRegistry>,
+        texts: Option<&'a crate::TextRegistry>,
+    ) {
+        self.images = images;
+        self.texts = texts;
     }
 
     pub(crate) fn draw_text_layout(
@@ -141,7 +156,7 @@ impl D2DRenderBackend {
 }
 
 #[cfg(target_os = "windows")]
-impl RenderBackend for D2DRenderBackend {
+impl<'a> RenderBackend for D2DRenderBackend<'a> {
     fn begin(&mut self, size: Sizef) {
         unsafe {
             if size.width != self.size.width || size.height != self.size.height {
@@ -178,7 +193,7 @@ impl RenderBackend for D2DRenderBackend {
 }
 
 #[cfg(target_os = "windows")]
-impl D2DRenderBackend {
+impl<'a> D2DRenderBackend<'a> {
     fn draw_command(&mut self, command: &PaintCommand) {
         match *command {
             PaintCommand::Clear { color } => unsafe {
@@ -266,8 +281,19 @@ impl D2DRenderBackend {
                 }
                 self.draw_linear_gradient(rect, start, end, stops);
             }
-            PaintCommand::DrawImage { .. } => {}
-            PaintCommand::DrawText { .. } => {}
+            PaintCommand::DrawImage { rect, image } => {
+                if let Some((width, height, rgba)) =
+                    self.images.and_then(|images| images.get(image))
+                {
+                    self.draw_image(rect, width, height, rgba);
+                }
+            }
+            PaintCommand::DrawText { position, text } => {
+                let layout = self.texts.and_then(|texts| texts.get(text));
+                if let Some(layout) = layout {
+                    layout.draw(self, position);
+                }
+            }
             PaintCommand::DrawGpuSurface { .. } => {}
         }
     }
@@ -350,6 +376,42 @@ impl D2DRenderBackend {
                 .CreateLinearGradientBrush(&props, None, &collection)
             {
                 self.context.FillRectangle(&rect_to_d2d(rect), &brush);
+            }
+        }
+    }
+
+    /// Creates a transient `ID2D1Bitmap1` from premultiplied-alpha RGBA8
+    /// bytes and draws it into `rect`. The bitmap is not cached since this
+    /// backend is reconstructed every frame (see `render_to_hwnd`).
+    fn draw_image(&mut self, rect: Rectf, width: u32, height: u32, rgba: &[u8]) {
+        let props = D2D1_BITMAP_PROPERTIES1 {
+            pixelFormat: D2D1_PIXEL_FORMAT {
+                format: DXGI_FORMAT_R8G8B8A8_UNORM,
+                alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+            },
+            dpiX: 96.0,
+            dpiY: 96.0,
+            bitmapOptions: D2D1_BITMAP_OPTIONS_NONE,
+            ..Default::default()
+        };
+
+        unsafe {
+            let bitmap = self.context.CreateBitmap(
+                D2D_SIZE_U { width, height },
+                Some(rgba.as_ptr() as *const core::ffi::c_void),
+                width * 4,
+                &props,
+            );
+
+            if let Ok(bitmap) = bitmap {
+                self.context.DrawBitmap(
+                    &bitmap,
+                    Some(&rect_to_d2d(rect)),
+                    1.0,
+                    D2D1_INTERPOLATION_MODE_LINEAR,
+                    None,
+                    None,
+                );
             }
         }
     }
@@ -462,6 +524,31 @@ pub fn render_to_hwnd(
     Some(())
 }
 
+/// Like [`render_to_hwnd`], but resolves `DrawImage`/`DrawText` paint
+/// commands against the provided registries.
+#[cfg(target_os = "windows")]
+pub fn render_to_hwnd_with_registries(
+    hwnd: *mut core::ffi::c_void,
+    size: Sizef,
+    scale: f32,
+    commands: &CommandList,
+    images: Option<&crate::ImageRegistry>,
+    texts: Option<&crate::TextRegistry>,
+) -> Option<()> {
+    if size.width <= 0.0 || size.height <= 0.0 {
+        return None;
+    }
+
+    let hwnd = HWND(hwnd);
+    let mut backend = D2DRenderBackend::new(hwnd)?;
+    backend.set_scale(scale);
+    backend.set_registries(images, texts);
+    backend.begin(size);
+    backend.replay(commands);
+    backend.end();
+    Some(())
+}
+
 #[cfg(not(target_os = "windows"))]
 pub struct D2DRenderBackend {
     _private: (),
@@ -483,6 +570,18 @@ pub fn render_to_hwnd(
     _size: Sizef,
     _scale: f32,
     _commands: &CommandList,
+) -> Option<()> {
+    None
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn render_to_hwnd_with_registries(
+    _hwnd: *mut core::ffi::c_void,
+    _size: Sizef,
+    _scale: f32,
+    _commands: &CommandList,
+    _images: Option<&crate::ImageRegistry>,
+    _texts: Option<&crate::TextRegistry>,
 ) -> Option<()> {
     None
 }
