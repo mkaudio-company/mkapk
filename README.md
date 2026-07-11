@@ -300,7 +300,14 @@ Every crate in this workspace inherits `license = "GPL-3.0-only"` from `[workspa
 
 The AAX SDK (not vendored in this repo — see `AAX_SDK_PATH` above) is itself dual-licensed by Avid: a commercial agreement, or GPL v3. Since this project is GPL-3.0, using the AAX SDK under its GPL v3 option here is fully compatible.
 
-Every `crates/gui-*` library crate carries real `description`/`categories`/`keywords` (inherited from `[workspace.package]`, `cargo package -p <crate>` confirmed publishable). `xtask` and `plugins/gain` are marked `publish = false` — a workspace-internal build tool and the template `cargo xtask new-plugin` copies from, neither meant to be published under those names.
+### Publishing
+
+Every `crates/mkapk-*` library crate carries real `description`/`categories`/`keywords` (inherited from `[workspace.package]`) and its own `README.md` (`readme = "README.md"` in each `Cargo.toml`, shown on its crates.io page). `xtask` and `plugins/gain` are marked `publish = false` — a workspace-internal build tool and the template `cargo xtask new-plugin` copies from, neither meant to be published under those names.
+
+Two things to know before publishing:
+
+- **Dependency order.** Every internal `mkapk-*` dependency is a `path` + `version` pair, and crates.io needs the `version` to already resolve to a real published version before it'll accept anything depending on it — so crates must be published bottom-up: `mkapk-core` → `mkapk-host` → (`mkapk-res`, `mkapk-accessibility`) → (`mkapk-win32`, `mkapk-mac`, `mkapk-widgets`, `mkapk-vst3`) → (`mkapk-au`, `mkapk-aax`) → `mkapk-test-host` → `mkapk-standalone`. `cargo publish --dry-run` on a crate whose dependencies aren't live yet fails with "no matching package named `mkapk-*` found" — that's this ordering constraint, not a bug; wait for crates.io to index each dependency (usually well under a minute) before publishing what depends on it.
+- **`mkapk-vst3`'s vendored SDK is excluded from the published package.** `crates/mkapk-vst3/thirdparty/` (the pinned VST3 SDK git submodules) is real, ~23MB of C++ source on disk — Cargo doesn't respect submodule boundaries when packaging, so without `exclude = ["thirdparty/"]` in its `Cargo.toml` the published tarball blows past crates.io's 10MB upload limit (`413 Payload Too Large`). This means a `mkapk-vst3` installed from crates.io always builds as a view-only stub — same as `mkapk-aax` without `AAX_SDK_PATH` — since the real, SDK-linked entry point only exists when building from a git checkout with the submodules populated (see `mkapk-vst3`'s own `README.md`).
 
 ## Acknowledgments
 

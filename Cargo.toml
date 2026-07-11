@@ -18,7 +18,7 @@ members = [
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 authors = ["Minjae Kim <minjaekim@mkaudio.company>"]
@@ -30,15 +30,15 @@ categories = ["multimedia::audio", "gui", "development-tools::ffi", "os::macos-a
 keywords = ["audio-plugin", "vst3", "au", "aax", "midi"]
 
 [workspace.dependencies]
-mkapk-core = { path = "crates/mkapk-core", version = "0.1.0" }
-mkapk-host = { path = "crates/mkapk-host", version = "0.1.0" }
-mkapk-res = { path = "crates/mkapk-res", version = "0.1.0" }
-mkapk-accessibility = { path = "crates/mkapk-accessibility", version = "0.1.0" }
-mkapk-mac = { path = "crates/mkapk-mac", version = "0.1.0" }
-mkapk-test-host = { path = "crates/mkapk-test-host", version = "0.1.0" }
-mkapk-widgets = { path = "crates/mkapk-widgets", version = "0.1.0" }
-mkapk-win32 = { path = "crates/mkapk-win32", version = "0.1.0" }
-mkapk-standalone = { path = "crates/mkapk-standalone", version = "0.1.0" }
-mkapk-vst3 = { path = "crates/mkapk-vst3", version = "0.1.0" }
-mkapk-au = { path = "crates/mkapk-au", version = "0.1.0" }
-mkapk-aax = { path = "crates/mkapk-aax", version = "0.1.0" }
+mkapk-core = { path = "crates/mkapk-core", version = "0.1.1" }
+mkapk-host = { path = "crates/mkapk-host", version = "0.1.1" }
+mkapk-res = { path = "crates/mkapk-res", version = "0.1.1" }
+mkapk-accessibility = { path = "crates/mkapk-accessibility", version = "0.1.1" }
+mkapk-mac = { path = "crates/mkapk-mac", version = "0.1.1" }
+mkapk-test-host = { path = "crates/mkapk-test-host", version = "0.1.1" }
+mkapk-widgets = { path = "crates/mkapk-widgets", version = "0.1.1" }
+mkapk-win32 = { path = "crates/mkapk-win32", version = "0.1.1" }
+mkapk-standalone = { path = "crates/mkapk-standalone", version = "0.1.1" }
+mkapk-vst3 = { path = "crates/mkapk-vst3", version = "0.1.1" }
+mkapk-au = { path = "crates/mkapk-au", version = "0.1.1" }
+mkapk-aax = { path = "crates/mkapk-aax", version = "0.1.1" }

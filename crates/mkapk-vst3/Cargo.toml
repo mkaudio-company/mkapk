@@ -10,6 +10,7 @@ repository.workspace = true
 documentation.workspace = true
 categories.workspace = true
 keywords.workspace = true
+readme = "README.md"
 # a crate installed from crates.io always builds as a view-only stub (see `build.rs`),
 # and the real SDK-linked entry point only exists when building from a git checkout with
 # `git submodule update --init` run.
