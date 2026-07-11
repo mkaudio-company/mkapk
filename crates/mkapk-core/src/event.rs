@@ -272,7 +272,7 @@ mod tests {
         })
     }
 
-    fn build_tree() -> (
+    type BuildTreeResult = (
         Tree,
         LayoutResult,
         WidgetId,
@@ -281,7 +281,9 @@ mod tests {
         Rc<Counters>,
         Rc<Counters>,
         Rc<Counters>,
-    ) {
+    );
+
+    fn build_tree() -> BuildTreeResult {
         let mut tree = Tree::new();
 
         let root_counters = Counters::new();

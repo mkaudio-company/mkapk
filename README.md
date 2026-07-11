@@ -1,4 +1,4 @@
-# audio-processor-rs
+# mkapk(MKAudio Processor Kit)
 
 A cross-platform audio plugin build and packaging system for Rust: write **one processor (DSP) file and one UI file**, and build/bundle it as a Standalone app, VST3, AUv2, and AAX plugin on Windows and macOS.
 

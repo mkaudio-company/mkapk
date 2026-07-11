@@ -134,12 +134,12 @@ mod tests {
 
     #[test]
     fn gpu_surface_callback_can_be_set_and_invoked() {
-        use alloc::sync::Arc;
+        use alloc::rc::Rc;
         use core::cell::Cell;
 
         let surface = GpuSurface::new();
-        let called = Arc::new(Cell::new(false));
-        let called_clone = Arc::clone(&called);
+        let called = Rc::new(Cell::new(false));
+        let called_clone = Rc::clone(&called);
         surface.on_render(move |ctx| {
             *ctx = GpuContext::Stub;
             called_clone.set(true);

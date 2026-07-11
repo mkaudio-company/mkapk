@@ -157,6 +157,6 @@ mod tests {
 
         let id = ResourceId::from_bytes_le(b"test.png");
         let handle = registry.load::<Image>(id).unwrap();
-        assert!(!(&*handle).0.is_empty());
+        assert!(!(*handle).0.is_empty());
     }
 }
