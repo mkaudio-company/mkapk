@@ -1,0 +1,9 @@
+[submodule "crates/mkapk-vst3/thirdparty/pluginterfaces"]
+	path = crates/mkapk-vst3/thirdparty/pluginterfaces
+	url = https://github.com/steinbergmedia/vst3_pluginterfaces
+[submodule "crates/mkapk-vst3/thirdparty/base"]
+	path = crates/mkapk-vst3/thirdparty/base
+	url = https://github.com/steinbergmedia/vst3_base
+[submodule "crates/mkapk-vst3/thirdparty/public.sdk"]
+	path = crates/mkapk-vst3/thirdparty/public.sdk
+	url = https://github.com/steinbergmedia/vst3_public_sdk

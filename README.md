@@ -277,7 +277,12 @@ VST3 builds are gated by the `vst3` feature and `VST3_SDK_PATH`; AAX builds are 
 
 ## License
 
-This project is licensed under the MIT OR Apache-2.0 license. See `LICENSE-MIT` and `LICENSE-APACHE`.
+This project is dual-licensed:
+
+- **GPL-3.0** (see `LICENSE`) — free to use, modify, and distribute under the terms of the GNU General Public License v3, including the copyleft/source-disclosure obligations that come with it.
+- **Commercial license** — for anyone who wants to ship mkapk-based plugins without GPL's copyleft obligations (e.g. as part of closed-source software). Contact `minjaekim@mkaudio.company` for commercial terms.
+
+Every crate in this workspace inherits `license = "GPL-3.0-only"` from `[workspace.package]`; the commercial alternative above is a separate agreement outside of what Cargo/crates.io metadata can express.
 
 Every `crates/gui-*` library crate carries real `description`/`categories`/`keywords` (inherited from `[workspace.package]`, `cargo package -p <crate>` confirmed publishable). `xtask` and `plugins/gain` are marked `publish = false` — a workspace-internal build tool and the template `cargo xtask new-plugin` copies from, neither meant to be published under those names.
 
