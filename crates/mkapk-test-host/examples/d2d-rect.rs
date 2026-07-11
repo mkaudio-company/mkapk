@@ -1,9 +1,9 @@
 #![allow(unexpected_cfgs)]
 
-use gui_core::{
+use mkapk_core::{
     BLUE, Color, ColorStop, CommandList, GREEN, PaintCommand, Pointf, RED, Rectf, Sizef,
 };
-use gui_host::{
+use mkapk_host::{
     EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor, SizeConstraints,
 };
 
@@ -42,7 +42,7 @@ impl PluginEditor for RectEditor {
 
         #[cfg(target_os = "windows")]
         {
-            gui_win32::render_to_hwnd(self.hwnd, self.size, self.scale, &commands);
+            mkapk_win32::render_to_hwnd(self.hwnd, self.size, self.scale, &commands);
         }
 
         #[cfg(not(target_os = "windows"))]
@@ -128,5 +128,5 @@ fn build_commands(size: Sizef) -> CommandList {
 }
 
 fn main() {
-    gui_test_host::run_test_host_with_editor(1000, 400, 300, RectEditor::new());
+    mkapk_test_host::run_test_host_with_editor(1000, 400, 300, RectEditor::new());
 }

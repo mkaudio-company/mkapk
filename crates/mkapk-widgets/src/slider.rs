@@ -1,10 +1,10 @@
 use core::cell::Cell;
 
-use gui_core::{
+use mkapk_core::{
     AccessibilityNode, CommandList, EventResponse, LayoutConstraints, MouseButton, MouseEvent,
     PaintCommand, PointerEvent, Pointf, Rectf, Role, Sizef, Widget, WidgetId,
 };
-use gui_host::{NormalizedValue, ParameterId};
+use mkapk_host::{NormalizedValue, ParameterId};
 
 use crate::Theme;
 

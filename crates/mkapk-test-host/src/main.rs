@@ -31,5 +31,5 @@ fn main() {
         }
     }
 
-    gui_test_host::run_test_host(duration_ms, width, height);
+    mkapk_test_host::run_test_host(duration_ms, width, height);
 }

@@ -722,16 +722,16 @@ dependencies = [
 name = "gain-plugin"
 version = "0.1.0"
 dependencies = [
- "gui-aax",
- "gui-au",
- "gui-core",
- "gui-host",
- "gui-mac",
- "gui-res",
- "gui-standalone",
- "gui-vst3",
- "gui-widgets",
- "gui-win32",
+ "mkapk-aax",
+ "mkapk-au",
+ "mkapk-core",
+ "mkapk-host",
+ "mkapk-mac",
+ "mkapk-res",
+ "mkapk-standalone",
+ "mkapk-vst3",
+ "mkapk-widgets",
+ "mkapk-win32",
 ]
 
 [[package]]
@@ -770,140 +770,6 @@ name = "glob"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
-
-[[package]]
-name = "gui-aax"
-version = "0.1.0"
-dependencies = [
- "gui-core",
- "gui-host",
- "gui-widgets",
-]
-
-[[package]]
-name = "gui-accessibility"
-version = "0.1.0"
-dependencies = [
- "gui-core",
- "gui-mac",
- "gui-test-host",
- "gui-win32",
-]
-
-[[package]]
-name = "gui-au"
-version = "0.1.0"
-dependencies = [
- "au-sys",
- "cocoa",
- "core-foundation 0.10.1",
- "gui-core",
- "gui-host",
- "gui-widgets",
- "objc",
-]
-
-[[package]]
-name = "gui-core"
-version = "0.1.0"
-dependencies = [
- "criterion",
-]
-
-[[package]]
-name = "gui-host"
-version = "0.1.0"
-dependencies = [
- "crossbeam-channel",
- "gui-core",
-]
-
-[[package]]
-name = "gui-mac"
-version = "0.1.0"
-dependencies = [
- "cocoa",
- "core-foundation 0.10.1",
- "core-graphics 0.24.0",
- "core-text",
- "foreign-types",
- "gui-core",
- "gui-host",
- "objc",
-]
-
-[[package]]
-name = "gui-res"
-version = "0.1.0"
-dependencies = [
- "gui-core",
- "image",
- "resvg",
- "tiny-skia 0.12.0",
- "usvg",
-]
-
-[[package]]
-name = "gui-standalone"
-version = "0.1.0"
-dependencies = [
- "cocoa",
- "cpal",
- "gui-core",
- "gui-host",
- "gui-test-host",
- "midir",
- "mkgraphic",
- "objc",
- "objc2 0.5.2",
- "objc2-app-kit",
- "objc2-foundation",
- "ringbuf",
-]
-
-[[package]]
-name = "gui-test-host"
-version = "0.1.0"
-dependencies = [
- "cocoa",
- "core-graphics 0.24.0",
- "gui-accessibility",
- "gui-core",
- "gui-host",
- "gui-mac",
- "gui-widgets",
- "gui-win32",
- "objc",
- "windows 0.62.2",
-]
-
-[[package]]
-name = "gui-vst3"
-version = "0.1.0"
-dependencies = [
- "gui-core",
- "gui-host",
- "vst3-com",
- "vst3-sys",
-]
-
-[[package]]
-name = "gui-widgets"
-version = "0.1.0"
-dependencies = [
- "gui-core",
- "gui-host",
-]
-
-[[package]]
-name = "gui-win32"
-version = "0.1.0"
-dependencies = [
- "gui-core",
- "gui-host",
- "windows 0.62.2",
- "windows-numerics",
-]
 
 [[package]]
 name = "half"
@@ -1177,6 +1043,140 @@ checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
 dependencies = [
  "adler2",
  "simd-adler32",
+]
+
+[[package]]
+name = "mkapk-aax"
+version = "0.1.0"
+dependencies = [
+ "mkapk-core",
+ "mkapk-host",
+ "mkapk-widgets",
+]
+
+[[package]]
+name = "mkapk-accessibility"
+version = "0.1.0"
+dependencies = [
+ "mkapk-core",
+ "mkapk-mac",
+ "mkapk-test-host",
+ "mkapk-win32",
+]
+
+[[package]]
+name = "mkapk-au"
+version = "0.1.0"
+dependencies = [
+ "au-sys",
+ "cocoa",
+ "core-foundation 0.10.1",
+ "mkapk-core",
+ "mkapk-host",
+ "mkapk-widgets",
+ "objc",
+]
+
+[[package]]
+name = "mkapk-core"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+]
+
+[[package]]
+name = "mkapk-host"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "mkapk-core",
+]
+
+[[package]]
+name = "mkapk-mac"
+version = "0.1.0"
+dependencies = [
+ "cocoa",
+ "core-foundation 0.10.1",
+ "core-graphics 0.24.0",
+ "core-text",
+ "foreign-types",
+ "mkapk-core",
+ "mkapk-host",
+ "objc",
+]
+
+[[package]]
+name = "mkapk-res"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "mkapk-core",
+ "resvg",
+ "tiny-skia 0.12.0",
+ "usvg",
+]
+
+[[package]]
+name = "mkapk-standalone"
+version = "0.1.0"
+dependencies = [
+ "cocoa",
+ "cpal",
+ "midir",
+ "mkapk-core",
+ "mkapk-host",
+ "mkapk-test-host",
+ "mkgraphic",
+ "objc",
+ "objc2 0.5.2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "ringbuf",
+]
+
+[[package]]
+name = "mkapk-test-host"
+version = "0.1.0"
+dependencies = [
+ "cocoa",
+ "core-graphics 0.24.0",
+ "mkapk-accessibility",
+ "mkapk-core",
+ "mkapk-host",
+ "mkapk-mac",
+ "mkapk-widgets",
+ "mkapk-win32",
+ "objc",
+ "windows 0.62.2",
+]
+
+[[package]]
+name = "mkapk-vst3"
+version = "0.1.0"
+dependencies = [
+ "mkapk-core",
+ "mkapk-host",
+ "vst3-com",
+ "vst3-sys",
+]
+
+[[package]]
+name = "mkapk-widgets"
+version = "0.1.0"
+dependencies = [
+ "mkapk-core",
+ "mkapk-host",
+]
+
+[[package]]
+name = "mkapk-win32"
+version = "0.1.0"
+dependencies = [
+ "mkapk-core",
+ "mkapk-host",
+ "windows 0.62.2",
+ "windows-numerics",
 ]
 
 [[package]]

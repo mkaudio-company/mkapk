@@ -17,8 +17,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use gui_core::Sizef;
-use gui_host::{
+use mkapk_core::Sizef;
+use mkapk_host::{
     EditorHost, LockFreeParameterGateway, MidiEventQueue, MidiMessage, NormalizedValue,
     ParameterGateway, ParameterId, PeakMeter, PluginEditor, Processor, apply_pending_midi,
     apply_pending_parameters,
@@ -114,7 +114,7 @@ pub fn run<P, E>(
     );
     if _streams.is_none() {
         eprintln!(
-            "gui-standalone: no usable audio output device found in this environment; running UI only"
+            "mkapk-standalone: no usable audio output device found in this environment; running UI only"
         );
     }
 
@@ -122,25 +122,25 @@ pub fn run<P, E>(
     // macOS; the plugin's own content view inside it is created and driven
     // by this project's rendering pipeline (see `main_window`). mkgraphic's
     // cross-platform Window/App facade doesn't cover Windows yet, so that
-    // platform still uses gui-test-host's own window creation.
+    // platform still uses mkapk-test-host's own window creation.
     #[cfg(target_os = "macos")]
     let (window, parent_handle) =
         main_window::MainWindow::create("Gain", config.width, config.height);
     #[cfg(not(target_os = "macos"))]
-    let (window, parent_handle) = gui_test_host::create_host_window(config.width, config.height);
+    let (window, parent_handle) = mkapk_test_host::create_host_window(config.width, config.height);
 
     let host = StandaloneEditorHost { gateway };
     editor.open(parent_handle, &host);
     editor.resize(Sizef::new(config.width as f32, config.height as f32));
 
     // On macOS, the editor wires its own view's mouse handling directly
-    // (see `gui_mac::paint_view`) as part of `open()`. `gui-test-host`'s
+    // (see `mkapk_mac::paint_view`) as part of `open()`. `mkapk-test-host`'s
     // Win32 window, by contrast, owns the only `wndproc` we get a chance to
     // hook on Windows, so it needs the sink installed from here instead;
-    // `gui_test_host::attach_mouse_input` owns the unsafe raw-pointer
+    // `mkapk_test_host::attach_mouse_input` owns the unsafe raw-pointer
     // capture this requires (this crate forbids unsafe code itself).
     #[cfg(not(target_os = "macos"))]
-    gui_test_host::attach_mouse_input(&window, &mut editor);
+    mkapk_test_host::attach_mouse_input(&window, &mut editor);
 
     while window.pump_events() {
         editor.idle();
@@ -174,13 +174,13 @@ struct AudioStreams {
 /// processor that accepts MIDI should still run (just never receive any)
 /// when there's no MIDI hardware/virtual port to read from.
 fn open_midi_input(queue: Arc<MidiEventQueue>) -> Option<midir::MidiInputConnection<()>> {
-    let input = midir::MidiInput::new("gui-standalone").ok()?;
+    let input = midir::MidiInput::new("mkapk-standalone").ok()?;
     let ports = input.ports();
     let port = ports.first()?;
     input
         .connect(
             port,
-            "gui-standalone-input",
+            "mkapk-standalone-input",
             move |_timestamp_micros, bytes, ()| {
                 let status = *bytes.first().unwrap_or(&0);
                 let data1 = bytes.get(1).copied().unwrap_or(0);
@@ -233,7 +233,7 @@ where
     let midi_input = midi_queue.as_ref().cloned().and_then(open_midi_input);
     if midi_queue.is_some() && midi_input.is_none() {
         eprintln!(
-            "gui-standalone: this processor accepts MIDI, but no MIDI input port was found in this environment"
+            "mkapk-standalone: this processor accepts MIDI, but no MIDI input port was found in this environment"
         );
     }
 
@@ -249,7 +249,7 @@ where
         }
         if supported.sample_rate().0 != output_stream_config.sample_rate.0 {
             eprintln!(
-                "gui-standalone: input device sample rate ({} Hz) doesn't match the output device's ({} Hz); falling back to a test tone",
+                "mkapk-standalone: input device sample rate ({} Hz) doesn't match the output device's ({} Hz); falling back to a test tone",
                 supported.sample_rate().0,
                 output_stream_config.sample_rate.0
             );
@@ -261,7 +261,7 @@ where
         let rb = HeapRb::<f32>::new(MAX_BLOCK_SIZE * channels.max(1) * RING_BUFFER_BLOCKS);
         let (mut producer, consumer) = rb.split();
 
-        let err_fn = |err| eprintln!("gui-standalone: input stream error: {err}");
+        let err_fn = |err| eprintln!("mkapk-standalone: input stream error: {err}");
         let stream = device
             .build_input_stream(
                 &input_stream_config,
@@ -292,7 +292,7 @@ where
     let mut tone_phase = 0.0_f32;
     let tone_increment = 220.0 * core::f32::consts::TAU / sample_rate as f32;
 
-    let err_fn = |err| eprintln!("gui-standalone: audio stream error: {err}");
+    let err_fn = |err| eprintln!("mkapk-standalone: audio stream error: {err}");
 
     let output_stream = output_device
         .build_output_stream(

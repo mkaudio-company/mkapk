@@ -1,5 +1,5 @@
 //! Real VST3 `IComponent` + `IAudioProcessor` implementation, bridging any
-//! `gui_host::Processor` into a loadable VST3 plugin's audio-processing
+//! `mkapk_host::Processor` into a loadable VST3 plugin's audio-processing
 //! side. Not generic over the concrete `Processor` type (COM vtable
 //! generation via `#[VST3(implements(...))]` needs a concrete struct); any
 //! plugin project supplies its processor as a `Box<dyn Processor>`.
@@ -7,7 +7,7 @@ use std::cell::{Cell, RefCell};
 use std::mem;
 use std::os::raw::c_void;
 
-use gui_host::{MidiMessage, NormalizedValue, ParameterId, Processor};
+use mkapk_host::{MidiMessage, NormalizedValue, ParameterId, Processor};
 use vst3_com::sys::GUID;
 use vst3_com::{IID, VstPtr};
 use vst3_sys::VST3;
@@ -49,7 +49,7 @@ fn count_channels(arr: SpeakerArrangement) -> i32 {
 }
 
 /// Real `IComponent` + `IAudioProcessor` bridging a boxed
-/// `gui_host::Processor` into VST3's audio-processing contract.
+/// `mkapk_host::Processor` into VST3's audio-processing contract.
 /// `IProcessContextRequirements` has been mandatory since VST SDK 3.7;
 /// confirmed via the real Steinberg validator (`validator.exe`/`validator`,
 /// built from `vst3sdk`'s own CMake project), which otherwise fails a

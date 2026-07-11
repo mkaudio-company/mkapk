@@ -1,9 +1,9 @@
 #![allow(unexpected_cfgs)]
 
-use gui_core::{CommandList, RenderBackend, Sizef};
+use mkapk_core::{CommandList, RenderBackend, Sizef};
 
 #[cfg(target_os = "windows")]
-use gui_core::{Color, PaintCommand, Pointf, Rectf};
+use mkapk_core::{Color, PaintCommand, Pointf, Rectf};
 
 #[cfg(target_os = "windows")]
 use windows::{
@@ -340,7 +340,7 @@ impl<'a> D2DRenderBackend<'a> {
         rect: Rectf,
         start: Pointf,
         end: Pointf,
-        stops: &[gui_core::ColorStop],
+        stops: &[mkapk_core::ColorStop],
     ) {
         self.gradient_stop_buffer.clear();
         self.gradient_stop_buffer.reserve(stops.len());

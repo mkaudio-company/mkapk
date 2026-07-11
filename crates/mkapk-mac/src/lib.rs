@@ -34,6 +34,6 @@ pub mod gpu;
 #[cfg(feature = "gpu-surface")]
 pub use gpu::{clear_to_color, render_gpu_surface_to_view};
 
-pub fn gui_mac_ready() -> bool {
+pub fn mkapk_mac_ready() -> bool {
     true
 }

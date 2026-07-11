@@ -31,23 +31,23 @@ required-features = ["au"]
 
 [features]
 default = []
-standalone = ["dep:gui-standalone"]
-vst3 = ["dep:gui-vst3"]
-au = ["dep:gui-au"]
-aax = ["dep:gui-aax"]
+standalone = ["dep:mkapk-standalone"]
+vst3 = ["dep:mkapk-vst3"]
+au = ["dep:mkapk-au"]
+aax = ["dep:mkapk-aax"]
 
 [dependencies]
-gui-core = { workspace = true }
-gui-host = { workspace = true }
-gui-res = { workspace = true }
-gui-widgets = { workspace = true }
-gui-standalone = { workspace = true, optional = true }
-gui-vst3 = { workspace = true, optional = true }
-gui-au = { workspace = true, optional = true }
-gui-aax = { workspace = true, optional = true, features = ["aax"] }
+mkapk-core = { workspace = true }
+mkapk-host = { workspace = true }
+mkapk-res = { workspace = true }
+mkapk-widgets = { workspace = true }
+mkapk-standalone = { workspace = true, optional = true }
+mkapk-vst3 = { workspace = true, optional = true }
+mkapk-au = { workspace = true, optional = true }
+mkapk-aax = { workspace = true, optional = true, features = ["aax"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-gui-mac = { workspace = true }
+mkapk-mac = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-gui-win32 = { workspace = true }
+mkapk-win32 = { workspace = true }

@@ -1,11 +1,11 @@
 //! AAX build helper for `cargo xtask bundle-aax`.
 //!
-//! `AAX_SDK_PATH` (already read by `gui-aax`'s build.rs, and re-checked by
+//! `AAX_SDK_PATH` (already read by `mkapk-aax`'s build.rs, and re-checked by
 //! `plugins/gain`'s own build.rs -- see its comment) gates the real AAX
 //! entry point in. `AAX_SDK_CMAKE_DIR` is the *installed* SDK package
 //! directory containing `AAX_SDKConfig.cmake` (produced by the AAX SDK's
 //! own `cmake --install`), used so this crate's C++ shim
-//! (`crates/gui-aax/cpp/`) can `find_package(AAX_SDK REQUIRED)`. Falls back
+//! (`crates/mkapk-aax/cpp/`) can `find_package(AAX_SDK REQUIRED)`. Falls back
 //! to `<AAX_SDK_PATH>/INSTALL` if unset, which is where this workspace's own
 //! from-source SDK build was installed.
 //!
@@ -17,10 +17,10 @@
 //! Unlike VST3/AU (a single `cargo build` producing a cdylib that
 //! `bundle.rs` wraps in a hand-assembled bundle), AAX needs several steps:
 //! `cargo build` produces a Rust *staticlib* exporting the generic
-//! `gui_aax_*` bridge functions; a small plugin-owned binary (the plugin's
+//! `mkapk_aax_*` bridge functions; a small plugin-owned binary (the plugin's
 //! `<slug>-aax-page-table`) generates this specific plugin's page-table XML
 //! from the same parameter metadata; and the AAX SDK's own CMake tooling
-//! (`aax_plugin()` in `crates/gui-aax/cpp/CMakeLists.txt`) compiles the
+//! (`aax_plugin()` in `crates/mkapk-aax/cpp/CMakeLists.txt`) compiles the
 //! generic C++ shim, links it against that staticlib, and assembles the
 //! real `.aaxplugin` bundle. Which `plugins/<slug>` crate is targeted comes
 //! from [`PluginTarget::resolve`] (`PLUGIN_CRATE` env var, default `"gain"`),
@@ -49,7 +49,7 @@ pub fn bundle_aax_status() -> BundleStatus {
 
     let Some(aax_sdk_path) = env::var("AAX_SDK_PATH").ok() else {
         return BundleStatus::Skip(
-            "AAX_SDK_PATH not set; gui-aax builds as a no-op stub and there is no SDK to build \
+            "AAX_SDK_PATH not set; mkapk-aax builds as a no-op stub and there is no SDK to build \
              the C++ shim against."
                 .to_string(),
         );
@@ -61,7 +61,7 @@ pub fn bundle_aax_status() -> BundleStatus {
     if !Path::new(&cmake_dir).exists() {
         return BundleStatus::Fail(format!(
             "AAX_SDK_CMAKE_DIR (or the default <AAX_SDK_PATH>/INSTALL) does not exist: \
-             {cmake_dir}. Run `cmake --install` on the AAX SDK first (see gui-aax's README)."
+             {cmake_dir}. Run `cmake --install` on the AAX SDK first (see mkapk-aax's README)."
         ));
     }
 
@@ -94,7 +94,7 @@ pub fn bundle_aax_status() -> BundleStatus {
         ));
     }
 
-    let cpp_dir = workspace_root.join("crates/gui-aax/cpp");
+    let cpp_dir = workspace_root.join("crates/mkapk-aax/cpp");
 
     println!(
         "Running: cargo run -p {} --bin {} --features aax",
@@ -165,7 +165,9 @@ pub fn bundle_aax_status() -> BundleStatus {
         .status()
         .expect("failed to run cmake configure");
     if !configure_status.success() {
-        return BundleStatus::Fail("cmake configure of crates/gui-aax/cpp did not succeed".into());
+        return BundleStatus::Fail(
+            "cmake configure of crates/mkapk-aax/cpp did not succeed".into(),
+        );
     }
 
     println!(
@@ -179,7 +181,7 @@ pub fn bundle_aax_status() -> BundleStatus {
         .status()
         .expect("failed to run cmake --build");
     if !build_status.success() {
-        return BundleStatus::Fail("cmake --build of crates/gui-aax/cpp did not succeed".into());
+        return BundleStatus::Fail("cmake --build of crates/mkapk-aax/cpp did not succeed".into());
     }
 
     let bundle_path = build_dir.join(format!("{plugin_name}.aaxplugin"));
@@ -238,7 +240,7 @@ fn run_real_validator(
         }
     }
 
-    let harness_source = workspace_root.join("crates/gui-aax/cpp/aaxval_harness.cpp");
+    let harness_source = workspace_root.join("crates/mkapk-aax/cpp/aaxval_harness.cpp");
     let harness_binary = harness_bin_dir.join("aaxval_harness");
     let headers_dir = format!("{frameworks_dir}/AAXValidator.framework/Versions/A/Headers");
 

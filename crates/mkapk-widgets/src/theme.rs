@@ -1,4 +1,4 @@
-use gui_core::{Color, Insetsf};
+use mkapk_core::{Color, Insetsf};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Theme {

@@ -6,13 +6,13 @@ fn main() {
             // `vst3-sys` is a self-contained Rust binding (git dependency);
             // it does not need a local Steinberg VST3 SDK checkout to
             // build. This env var exists purely as an explicit opt-in gate,
-            // consistent with how `gui-aax` gates on `AAX_SDK_PATH`, so the
+            // consistent with how `mkapk-aax` gates on `AAX_SDK_PATH`, so the
             // build system can enable/disable each plugin format uniformly.
             println!("cargo:rustc-cfg=vst3_sdk");
         }
         Err(_) => {
             println!(
-                "cargo:warning=VST3_SDK_PATH not set; building gui-vst3 as a view-only stub (no real plugin entry point)."
+                "cargo:warning=VST3_SDK_PATH not set; building mkapk-vst3 as a view-only stub (no real plugin entry point)."
             );
         }
     }

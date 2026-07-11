@@ -1,10 +1,10 @@
 #![allow(unexpected_cfgs)]
 
-use gui_core::Sizef;
+use mkapk_core::Sizef;
 
 #[cfg(target_os = "windows")]
-use gui_core::Pointf;
-use gui_host::{
+use mkapk_core::Pointf;
+use mkapk_host::{
     EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor, SizeConstraints,
 };
 
@@ -13,7 +13,7 @@ struct TextEditor {
     size: Sizef,
     scale: f32,
     #[cfg(target_os = "windows")]
-    layout: gui_win32::TextLayout,
+    layout: mkapk_win32::TextLayout,
 }
 
 impl TextEditor {
@@ -23,7 +23,7 @@ impl TextEditor {
             size: Sizef::new(400.0, 300.0),
             scale: 1.0,
             #[cfg(target_os = "windows")]
-            layout: gui_win32::TextLayout::new("Hello DirectWrite", 24.0),
+            layout: mkapk_win32::TextLayout::new("Hello DirectWrite", 24.0),
         }
     }
 }
@@ -46,7 +46,13 @@ impl PluginEditor for TextEditor {
         #[cfg(target_os = "windows")]
         {
             let position = Pointf::new(20.0, 20.0);
-            gui_win32::draw_text_to_hwnd(self.hwnd, self.size, self.scale, &self.layout, position);
+            mkapk_win32::draw_text_to_hwnd(
+                self.hwnd,
+                self.size,
+                self.scale,
+                &self.layout,
+                position,
+            );
         }
 
         #[cfg(not(target_os = "windows"))]
@@ -63,5 +69,5 @@ impl PluginEditor for TextEditor {
 }
 
 fn main() {
-    gui_test_host::run_test_host_with_editor(1000, 400, 300, TextEditor::new());
+    mkapk_test_host::run_test_host_with_editor(1000, 400, 300, TextEditor::new());
 }

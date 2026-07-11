@@ -3,7 +3,7 @@ use std::ffi::{CStr, c_void};
 use std::mem;
 use std::rc::Rc;
 
-use gui_host::{EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor};
+use mkapk_host::{EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor};
 use vst3_sys as vst3_com;
 use vst3_sys::VST3;
 use vst3_sys::VstPtr;
@@ -23,7 +23,7 @@ pub type ComponentHandlerCell = Rc<RefCell<Option<VstPtr<dyn IComponentHandler>>
 pub struct PluginView {
     editor: RefCell<Box<dyn PluginEditor>>,
     frame: RefCell<Option<VstPtr<dyn IPlugFrame>>>,
-    size: Cell<gui_core::Sizef>,
+    size: Cell<mkapk_core::Sizef>,
     component_handler: ComponentHandlerCell,
 }
 
@@ -32,7 +32,7 @@ impl PluginView {
         Self::allocate(
             RefCell::new(editor),
             RefCell::new(None),
-            Cell::new(gui_core::Sizef::new(400.0, 300.0)),
+            Cell::new(mkapk_core::Sizef::new(400.0, 300.0)),
             Rc::new(RefCell::new(None)),
         )
     }
@@ -47,7 +47,7 @@ impl PluginView {
         Self::allocate(
             RefCell::new(editor),
             RefCell::new(None),
-            Cell::new(gui_core::Sizef::new(400.0, 300.0)),
+            Cell::new(mkapk_core::Sizef::new(400.0, 300.0)),
             component_handler,
         )
     }
@@ -177,7 +177,7 @@ impl IPlugView for PluginView {
         let rect = unsafe { &*new_size };
         let width = (rect.right - rect.left) as f32;
         let height = (rect.bottom - rect.top) as f32;
-        let size = gui_core::Sizef::new(width, height);
+        let size = mkapk_core::Sizef::new(width, height);
         self.size.set(size);
         self.editor.borrow_mut().resize(size);
 
@@ -215,7 +215,7 @@ struct ViewHost {
 }
 
 impl EditorHost for ViewHost {
-    fn request_resize(&self, size: gui_core::Sizef) {
+    fn request_resize(&self, size: mkapk_core::Sizef) {
         if let Some(frame) = &self.frame {
             let mut rect = ViewRect {
                 left: 0,
@@ -258,15 +258,15 @@ impl EditorHost for ViewHost {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gui_host::SizeConstraints;
-    use gui_host::editor::PluginEditor;
+    use mkapk_host::SizeConstraints;
+    use mkapk_host::editor::PluginEditor;
 
     struct TestEditor;
 
     impl PluginEditor for TestEditor {
         fn open(&mut self, _parent: ParentWindowHandle, _host: &dyn EditorHost) {}
         fn close(&mut self) {}
-        fn resize(&mut self, _size: gui_core::Sizef) {}
+        fn resize(&mut self, _size: mkapk_core::Sizef) {}
         fn idle(&mut self) {}
         fn on_parameter_changed(&mut self, _id: ParameterId, _value: NormalizedValue) {}
         fn size_constraints(&self) -> SizeConstraints {

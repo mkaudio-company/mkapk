@@ -1,5 +1,5 @@
 [package]
-name = "gui-test-host"
+name = "mkapk-test-host"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,22 +12,22 @@ categories.workspace = true
 keywords.workspace = true
 
 [lib]
-name = "gui_test_host"
+name = "mkapk_test_host"
 path = "src/lib.rs"
 
 [[bin]]
-name = "gui-test-host"
+name = "mkapk-test-host"
 path = "src/main.rs"
 
 [dependencies]
-gui-core = { workspace = true }
-gui-host = { workspace = true }
-gui-mac = { workspace = true }
-gui-win32 = { workspace = true }
-gui-widgets = { workspace = true }
+mkapk-core = { workspace = true }
+mkapk-host = { workspace = true }
+mkapk-mac = { workspace = true }
+mkapk-win32 = { workspace = true }
+mkapk-widgets = { workspace = true }
 
 [dev-dependencies]
-gui-accessibility = { workspace = true }
+mkapk-accessibility = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62.2", default-features = false, features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_Graphics_Gdi"] }
@@ -38,7 +38,7 @@ objc = "0.2.7"
 core-graphics = "0.24.0"
 
 [features]
-gpu-surface = ["gui-core/gpu-surface", "gui-mac/gpu-surface", "gui-win32/gpu-surface"]
+gpu-surface = ["mkapk-core/gpu-surface", "mkapk-mac/gpu-surface", "mkapk-win32/gpu-surface"]
 
 [[example]]
 name = "gpu-surface"

@@ -1,6 +1,6 @@
 #![allow(unsafe_op_in_unsafe_fn, deprecated)]
 
-use gui_host::{EditorHost, ParentWindowHandle, PluginEditor};
+use mkapk_host::{EditorHost, ParentWindowHandle, PluginEditor};
 
 #[cfg(target_os = "macos")]
 pub struct MacWindow {
@@ -17,7 +17,7 @@ pub struct MacWindow {
 struct EditorWindowState {
     editor: Box<dyn PluginEditor>,
     host: Box<dyn EditorHost>,
-    last_size: gui_core::Sizef,
+    last_size: mkapk_core::Sizef,
 }
 
 #[cfg(target_os = "macos")]
@@ -56,7 +56,7 @@ impl MacWindow {
         self.view
     }
 
-    pub fn bounds(&self) -> gui_core::Rectf {
+    pub fn bounds(&self) -> mkapk_core::Rectf {
         unsafe { bounds_mac(self) }
     }
 }
@@ -83,8 +83,8 @@ impl MacWindow {
         core::ptr::null_mut()
     }
 
-    pub fn bounds(&self) -> gui_core::Rectf {
-        gui_core::Rectf::default()
+    pub fn bounds(&self) -> mkapk_core::Rectf {
+        mkapk_core::Rectf::default()
     }
 }
 
@@ -146,7 +146,7 @@ unsafe fn create_mac(
         _ => return None,
     };
 
-    let size = gui_core::Sizef::new(width as f32, height as f32);
+    let size = mkapk_core::Sizef::new(width as f32, height as f32);
     let state = Box::into_raw(Box::new(EditorWindowState {
         editor,
         host,
@@ -200,21 +200,21 @@ unsafe fn create_standalone_view(width: u32, height: u32) -> Option<(id, id)> {
 }
 
 #[cfg(target_os = "macos")]
-unsafe fn bounds_mac(window: &MacWindow) -> gui_core::Rectf {
+unsafe fn bounds_mac(window: &MacWindow) -> mkapk_core::Rectf {
     let view = window.view as id;
     let nsrect: NSRect = msg_send![view, bounds];
 
     if let Some(state) = state_for_view(view) {
-        let size = gui_core::Sizef::new(nsrect.size.width as f32, nsrect.size.height as f32);
+        let size = mkapk_core::Sizef::new(nsrect.size.width as f32, nsrect.size.height as f32);
         if size != (*state).last_size {
             (*state).last_size = size;
             (*state).editor.resize(size);
         }
     }
 
-    gui_core::Rectf::new(
-        gui_core::Point::new(nsrect.origin.x as f32, nsrect.origin.y as f32),
-        gui_core::Size::new(nsrect.size.width as f32, nsrect.size.height as f32),
+    mkapk_core::Rectf::new(
+        mkapk_core::Point::new(nsrect.origin.x as f32, nsrect.origin.y as f32),
+        mkapk_core::Size::new(nsrect.size.width as f32, nsrect.size.height as f32),
     )
 }
 

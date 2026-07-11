@@ -1,44 +1,44 @@
 //! The plugin's editor UI. This is the ONE UI file — every build target
 //! (Standalone/VST3/AU/AAX) shares this same `GainEditor` implementation of
-//! `gui_host::PluginEditor`. The processor lives separately in
+//! `mkapk_host::PluginEditor`. The processor lives separately in
 //! `crate::processor`; the two are wired together only via
-//! `gui_host::LockFreeParameterGateway`, never a direct reference to each
+//! `mkapk_host::LockFreeParameterGateway`, never a direct reference to each
 //! other, so this file has no audio-thread/real-time concerns at all.
 use std::cell::Cell;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use gui_core::{
+use mkapk_core::{
     Color, CommandList, Event, EventDispatcher, EventResponse, ImageId, Insetsf, LayoutConstraints,
     LayoutDirection, LayoutEngine, LayoutNode, LayoutResult, MouseEvent, PaintCommand,
     PointerEvent, Pointf, Rectf, Sizef, TextLayoutId, TraverseOrder, Tree, Widget, WidgetId,
     downcast_widget_ref,
 };
-use gui_host::{
+use mkapk_host::{
     EditorHost, LockFreeParameterGateway, NormalizedValue, ParameterGateway, ParameterId,
     ParentWindowHandle, PeakMeter, PluginEditor, SizeConstraints,
 };
-use gui_res::{
+use mkapk_res::{
     PngImage, Resource, ResourceBundle, ResourceHandle, ResourceId, ResourceRegistry,
     generated::EMBEDDED,
 };
-use gui_widgets::{Knob, Label, Slider, Theme};
+use mkapk_widgets::{Knob, Label, Slider, Theme};
 
 use crate::processor::GAIN_PARAM;
 
 #[cfg(target_os = "macos")]
-type ImageRegistry = gui_mac::ImageRegistry;
+type ImageRegistry = mkapk_mac::ImageRegistry;
 #[cfg(target_os = "macos")]
-type TextRegistry = gui_mac::TextRegistry;
+type TextRegistry = mkapk_mac::TextRegistry;
 #[cfg(target_os = "macos")]
-type PlatformTextLayout = gui_mac::TextLayout;
+type PlatformTextLayout = mkapk_mac::TextLayout;
 
 #[cfg(target_os = "windows")]
-type ImageRegistry = gui_win32::ImageRegistry;
+type ImageRegistry = mkapk_win32::ImageRegistry;
 #[cfg(target_os = "windows")]
-type TextRegistry = gui_win32::TextRegistry;
+type TextRegistry = mkapk_win32::TextRegistry;
 #[cfg(target_os = "windows")]
-type PlatformTextLayout = gui_win32::TextLayout;
+type PlatformTextLayout = mkapk_win32::TextLayout;
 
 struct Panel {
     id: WidgetId,
@@ -96,7 +96,7 @@ pub struct GainEditor {
     text_registry: TextRegistry,
     last_meter_percent: i32,
     #[cfg(target_os = "macos")]
-    accessibility_handle: Option<gui_mac::AccessibilityElementHandle>,
+    accessibility_handle: Option<mkapk_mac::AccessibilityElementHandle>,
     _panel: WidgetId,
     _label: WidgetId,
     slider_id: WidgetId,
@@ -107,7 +107,7 @@ impl GainEditor {
     /// `gateway` should be the same `Arc<LockFreeParameterGateway>` driving
     /// the paired `GainProcessor`'s real-time callback, and `meter` the same
     /// `PeakMeter` that callback writes the real output level into (see
-    /// `gui-standalone` or the VST3/AU entry points for how each format
+    /// `mkapk-standalone` or the VST3/AU entry points for how each format
     /// wires this up).
     pub fn new(gateway: Arc<LockFreeParameterGateway>, meter: PeakMeter) -> Self {
         let theme = Theme::default();
@@ -280,8 +280,8 @@ impl GainEditor {
             return;
         }
         let a11y_tree = self.tree.accessibility_tree();
-        let handle = gui_mac::build_accessibility_tree(&a11y_tree);
-        gui_mac::attach_to_view(self.view, &handle);
+        let handle = mkapk_mac::build_accessibility_tree(&a11y_tree);
+        mkapk_mac::attach_to_view(self.view, &handle);
         self.accessibility_handle = Some(handle);
     }
 
@@ -376,10 +376,10 @@ impl PluginEditor for GainEditor {
                 // Attach our own child `NSView` (with a real `drawRect:`
                 // override) instead of drawing directly into the
                 // host-provided view via `lockFocus`; see
-                // `gui_mac::paint_view` for why.
+                // `mkapk_mac::paint_view` for why.
                 #[cfg(target_os = "macos")]
                 {
-                    self.view = gui_mac::attach_paint_view(view, self.size).unwrap_or(view);
+                    self.view = mkapk_mac::attach_paint_view(view, self.size).unwrap_or(view);
 
                     let editor_ptr: *mut GainEditor = self;
                     // SAFETY: `editor_ptr` is only ever dereferenced
@@ -387,7 +387,7 @@ impl PluginEditor for GainEditor {
                     // `mouseDown:`/`mouseDragged:`/`mouseUp:` on the
                     // `GuiPaintView` just attached above, and never again
                     // once `close()` clears the sink below.
-                    gui_mac::set_input_sink(
+                    mkapk_mac::set_input_sink(
                         self.view,
                         Box::new(move |event| {
                             let editor = unsafe { &mut *editor_ptr };
@@ -425,7 +425,7 @@ impl PluginEditor for GainEditor {
         self.apply_layout();
 
         #[cfg(target_os = "macos")]
-        gui_mac::resize_paint_view(self.view, size);
+        mkapk_mac::resize_paint_view(self.view, size);
     }
 
     fn idle(&mut self) {
@@ -440,7 +440,7 @@ impl PluginEditor for GainEditor {
 
         #[cfg(target_os = "macos")]
         {
-            let _ = gui_mac::update_paint_view(
+            let _ = mkapk_mac::update_paint_view(
                 view,
                 size,
                 1.0,
@@ -452,7 +452,7 @@ impl PluginEditor for GainEditor {
 
         #[cfg(target_os = "windows")]
         {
-            let _ = gui_win32::render_to_hwnd_with_registries(
+            let _ = mkapk_win32::render_to_hwnd_with_registries(
                 view,
                 size,
                 1.0,
@@ -465,7 +465,7 @@ impl PluginEditor for GainEditor {
 
     fn close(&mut self) {
         #[cfg(target_os = "macos")]
-        gui_mac::clear_input_sink(self.view);
+        mkapk_mac::clear_input_sink(self.view);
     }
 
     fn on_parameter_changed(&mut self, id: ParameterId, value: NormalizedValue) {
@@ -525,14 +525,14 @@ mod tests {
     use std::rc::Rc;
     use std::sync::Arc;
 
-    use gui_core::{
+    use mkapk_core::{
         Event, EventDispatcher, EventResponse, LayoutConstraints, LayoutEngine, LayoutNode,
         Modifiers, MouseButton, MouseEvent, Pointf, Rectf, Tree, Widget,
     };
-    use gui_host::{
+    use mkapk_host::{
         LockFreeParameterGateway, NormalizedValue, ParameterId, PeakMeter, PluginEditor,
     };
-    use gui_widgets::{Slider, Theme};
+    use mkapk_widgets::{Slider, Theme};
 
     use super::GainEditor;
 
@@ -572,7 +572,8 @@ mod tests {
         let layout_box = layout.get(slider_id).unwrap();
         let slider_node = tree.find(slider_id).unwrap();
         let widget = slider_node.widget.borrow();
-        let slider_ref = gui_core::downcast_widget_ref::<gui_widgets::Slider>(&**widget).unwrap();
+        let slider_ref =
+            mkapk_core::downcast_widget_ref::<mkapk_widgets::Slider>(&**widget).unwrap();
         slider_ref.set_frame(Rectf::new(layout_box.origin, layout_box.size));
         drop(widget);
 
@@ -605,7 +606,7 @@ mod tests {
 
     #[test]
     fn slider_changes_flow_through_shared_gateway() {
-        use gui_host::ParameterGateway;
+        use mkapk_host::ParameterGateway;
 
         let gateway = test_gateway();
         let _editor = GainEditor::new(gateway.clone(), PeakMeter::new());
@@ -632,11 +633,11 @@ mod tests {
 
     #[test]
     fn on_mouse_down_on_slider_updates_gain_and_syncs_knob() {
-        use gui_host::ParameterGateway;
+        use mkapk_host::ParameterGateway;
 
         let gateway = test_gateway();
         let mut editor = GainEditor::new(gateway.clone(), PeakMeter::new());
-        editor.resize(gui_core::Sizef::new(400.0, 300.0));
+        editor.resize(mkapk_core::Sizef::new(400.0, 300.0));
 
         let slider_box = editor.layout.get(editor.slider_id).unwrap();
         let position = Pointf::new(
@@ -658,7 +659,7 @@ mod tests {
 
         let knob_node = editor.tree.find(editor.knob_id).unwrap();
         let widget = knob_node.widget.borrow();
-        let knob = gui_core::downcast_widget_ref::<gui_widgets::Knob>(&**widget).unwrap();
+        let knob = mkapk_core::downcast_widget_ref::<mkapk_widgets::Knob>(&**widget).unwrap();
         assert_eq!(knob.value(), value, "knob should mirror the slider's value");
     }
 }

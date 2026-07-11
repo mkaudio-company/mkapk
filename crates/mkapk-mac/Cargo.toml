@@ -1,5 +1,5 @@
 [package]
-name = "gui-mac"
+name = "mkapk-mac"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,8 +12,8 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
-gui-core = { workspace = true }
-gui-host = { workspace = true }
+mkapk-core = { workspace = true }
+mkapk-host = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26.1"
@@ -24,4 +24,4 @@ core-text = "21.0"
 foreign-types = "0.5"
 
 [features]
-gpu-surface = ["gui-core/gpu-surface"]
+gpu-surface = ["mkapk-core/gpu-surface"]

@@ -3,7 +3,7 @@
 
 // Component includes
 #include "AaxPlugin_Alg.h"
-#include "gui_aax_bridge.h"
+#include "mkapk_aax_bridge.h"
 
 // AAX Includes
 #include "AAX_Assert.h"
@@ -35,7 +35,7 @@ AaxGeneric_Parameters::AaxGeneric_Parameters() : AAX_CEffectParameters() {}
 AAX_Result AaxGeneric_Parameters::EffectInit()
 {
     // Master Bypass is an AAX-standard control, not one of the Rust
-    // processor's own parameters (gui_host::Processor has no notion of
+    // processor's own parameters (mkapk_host::Processor has no notion of
     // bypass -- see AaxPlugin_AlgProc.cpp, which passes audio straight
     // through on bypass rather than calling into the processor at all).
     {
@@ -55,17 +55,17 @@ AAX_Result AaxGeneric_Parameters::EffectInit()
     // (RegisterPacket's 2-argument overload) already copies each
     // parameter's current value into its packet with no custom code, so
     // there is no per-parameter callback to write.
-    const int32_t numParams = gui_aax_parameter_count();
+    const int32_t numParams = mkapk_aax_parameter_count();
     for (int32_t i = 0; i < numParams && i < kAaxGeneric_MaxParams; ++i)
     {
         char nameBuf[64];
-        gui_aax_parameter_name(i, nameBuf, sizeof(nameBuf));
+        mkapk_aax_parameter_name(i, nameBuf, sizeof(nameBuf));
 
         char idBuf[16];
-        std::snprintf(idBuf, sizeof(idBuf), "p%u", gui_aax_parameter_id(i));
+        std::snprintf(idBuf, sizeof(idBuf), "p%u", mkapk_aax_parameter_id(i));
 
-        const int32_t stepCount = gui_aax_parameter_step_count(i);
-        const float defaultValue = gui_aax_parameter_default(i);
+        const int32_t stepCount = mkapk_aax_parameter_step_count(i);
+        const float defaultValue = mkapk_aax_parameter_default(i);
 
         AAX_CString id(idBuf);
         std::unique_ptr<AAX_IParameter> param(new AAX_CParameter<float>(

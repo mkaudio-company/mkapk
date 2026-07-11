@@ -417,7 +417,7 @@ mod tests {
             let t = i as f32 / (steps - 1) as f32;
             let v = curve.ease(t);
             assert!(
-                v >= 0.0 && v <= 1.0,
+                (0.0..=1.0).contains(&v),
                 "ease-in-out produced out-of-bounds value {v} at t={t}"
             );
         }

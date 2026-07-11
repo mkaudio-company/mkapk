@@ -3,31 +3,31 @@ use crate::parameter::{NormalizedValue, ParameterId};
 pub trait PluginEditor {
     fn open(&mut self, parent: ParentWindowHandle, host: &dyn EditorHost);
     fn close(&mut self);
-    fn resize(&mut self, size: gui_core::Sizef);
+    fn resize(&mut self, size: mkapk_core::Sizef);
     fn idle(&mut self);
     fn on_parameter_changed(&mut self, id: ParameterId, value: NormalizedValue);
     fn size_constraints(&self) -> SizeConstraints;
 
     /// Real mouse input, forwarded by the platform windowing code (see
-    /// `gui-mac`'s `GuiPaintView` and `gui-test-host`'s Win32 window) once an
+    /// `mkapk-mac`'s `GuiPaintView` and `mkapk-test-host`'s Win32 window) once an
     /// OS event actually lands on the editor's view. Default no-ops so
     /// existing/test editors that don't need interactivity don't have to
     /// implement these.
-    fn on_mouse_down(&mut self, _event: &gui_core::MouseEvent) -> gui_core::EventResponse {
-        gui_core::EventResponse::Bubble
+    fn on_mouse_down(&mut self, _event: &mkapk_core::MouseEvent) -> mkapk_core::EventResponse {
+        mkapk_core::EventResponse::Bubble
     }
 
-    fn on_mouse_up(&mut self, _event: &gui_core::MouseEvent) -> gui_core::EventResponse {
-        gui_core::EventResponse::Bubble
+    fn on_mouse_up(&mut self, _event: &mkapk_core::MouseEvent) -> mkapk_core::EventResponse {
+        mkapk_core::EventResponse::Bubble
     }
 
-    fn on_mouse_move(&mut self, _event: &gui_core::PointerEvent) -> gui_core::EventResponse {
-        gui_core::EventResponse::Bubble
+    fn on_mouse_move(&mut self, _event: &mkapk_core::PointerEvent) -> mkapk_core::EventResponse {
+        mkapk_core::EventResponse::Bubble
     }
 }
 
 pub trait EditorHost {
-    fn request_resize(&self, size: gui_core::Sizef);
+    fn request_resize(&self, size: mkapk_core::Sizef);
     fn start_parameter_gesture(&self, id: ParameterId);
     fn end_parameter_gesture(&self, id: ParameterId);
     fn set_parameter_normalized(&self, id: ParameterId, value: NormalizedValue);
@@ -41,8 +41,8 @@ pub enum ParentWindowHandle {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SizeConstraints {
-    pub min_size: Option<gui_core::Sizef>,
-    pub max_size: Option<gui_core::Sizef>,
+    pub min_size: Option<mkapk_core::Sizef>,
+    pub max_size: Option<mkapk_core::Sizef>,
     pub aspect_ratio: Option<f32>,
 }
 
@@ -65,7 +65,7 @@ mod tests {
             self.log.push("close");
         }
 
-        fn resize(&mut self, _size: gui_core::Sizef) {
+        fn resize(&mut self, _size: mkapk_core::Sizef) {
             self.log.push("resize");
         }
 
@@ -85,7 +85,7 @@ mod tests {
     struct MockHost;
 
     impl EditorHost for MockHost {
-        fn request_resize(&self, _size: gui_core::Sizef) {}
+        fn request_resize(&self, _size: mkapk_core::Sizef) {}
         fn start_parameter_gesture(&self, _id: ParameterId) {}
         fn end_parameter_gesture(&self, _id: ParameterId) {}
         fn set_parameter_normalized(&self, _id: ParameterId, _value: NormalizedValue) {}
@@ -97,7 +97,7 @@ mod tests {
         let host = MockHost;
 
         editor.open(ParentWindowHandle::Windows(null_mut()), &host);
-        editor.resize(gui_core::Sizef::new(100.0, 200.0));
+        editor.resize(mkapk_core::Sizef::new(100.0, 200.0));
         editor.idle();
         editor.close();
 

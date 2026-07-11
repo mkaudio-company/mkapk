@@ -15,7 +15,7 @@ Formats are enabled per build via environment variable (no path set means that f
 | Standalone | always | Real audio I/O (input + output device selection) via `cpal`; window via [`mkgraphic`](https://crates.io/crates/mkgraphic) on macOS |
 | VST3 | `VST3_SDK_PATH` set | `vst3-sys` is self-contained (no separate SDK download needed); the env var is purely an explicit opt-in gate |
 | AUv2 | macOS only | No SDK needed (AudioToolbox ships with the OS) |
-| AAX | `AAX_SDK_PATH` set | Real, loadable `.aaxplugin`: a generic C++ shim (`crates/gui-aax/cpp/`) built by the AAX SDK's own CMake tooling, bridging into the same `Processor` every other format uses — see [AAX architecture](#aax-architecture-generic-c-shim--rust-processor) |
+| AAX | `AAX_SDK_PATH` set | Real, loadable `.aaxplugin`: a generic C++ shim (`crates/mkapk-aax/cpp/`) built by the AAX SDK's own CMake tooling, bridging into the same `Processor` every other format uses — see [AAX architecture](#aax-architecture-generic-c-shim--rust-processor) |
 
 Underneath the single project, this workspace also provides the platform-agnostic GUI framework it's built on: a retained widget tree, box/flex layout, native rendering (Direct2D on Windows, CoreGraphics on macOS), and a lock-free UI/audio parameter gateway.
 
@@ -50,35 +50,35 @@ Underneath the single project, this workspace also provides the platform-agnosti
 
 | Crate | Purpose |
 |-------|---------|
-| `gui-core` | Geometry, color, math, paint command list, widget tree, layout, events, animation, accessibility metadata. `#![no_std]` / `#![deny(unsafe_code)]`. |
-| `gui-host` | `Processor` and `PluginEditor`/host abstraction traits, lock-free parameter gateway (`LockFreeParameterGateway`) and peak meter (`PeakMeter`). `#![deny(unsafe_code)]`. |
-| `gui-res` | Resource IDs, static embedding, typed registry, SVG/PNG decoders. `#![deny(unsafe_code)]`. |
-| `gui-widgets` | Built-in controls: `Slider`, `Knob`, `Button`, `Label`, plus theme. `#![deny(unsafe_code)]`. |
-| `gui-accessibility` | Accessibility backend trait and platform stubs. |
-| `gui-win32` | Win32 windowing, Direct2D render backend, DirectWrite text, D3D11 GPU surface. |
-| `gui-mac` | AppKit/NSView windowing, CoreGraphics render backend (`drawRect:`-based `GuiPaintView`, with real mouse input), CoreText text, Metal GPU surface. |
-| `gui-standalone` | Standalone desktop host: real `cpal` audio I/O (input + output device selection, ring-buffer-bridged duplex capture/playback) and a real window, wired to any `Processor` + `PluginEditor` pair. |
-| `gui-vst3` | Real VST3 plugin entry point (`vst3_entry!` macro) gated by `VST3_SDK_PATH`, plus the `IPlugView` wrapper always available. |
-| `gui-au` | Real AUv2 plugin entry point (`au_entry!` macro, hand-written `AudioComponentPlugInInterface` dispatch over `au-sys`) plus an `AUCocoaUIBase`-ready Cocoa UI. |
-| `gui-aax` | Real AAX plugin entry point: a generic, plugin-agnostic C++ shim (`cpp/`) built by the AAX SDK's own CMake tooling, bridged into any `gui_host::Processor` via the `aax_entry!` macro and a page-table generator (`page_table` module); gated by `AAX_SDK_PATH`. Build-only stub without the SDK. |
-| `gui-test-host` | DAW-less standalone test host for rapid iteration. |
+| `mkapk-core` | Geometry, color, math, paint command list, widget tree, layout, events, animation, accessibility metadata. `#![no_std]` / `#![deny(unsafe_code)]`. |
+| `mkapk-host` | `Processor` and `PluginEditor`/host abstraction traits, lock-free parameter gateway (`LockFreeParameterGateway`) and peak meter (`PeakMeter`). `#![deny(unsafe_code)]`. |
+| `mkapk-res` | Resource IDs, static embedding, typed registry, SVG/PNG decoders. `#![deny(unsafe_code)]`. |
+| `mkapk-widgets` | Built-in controls: `Slider`, `Knob`, `Button`, `Label`, plus theme. `#![deny(unsafe_code)]`. |
+| `mkapk-accessibility` | Accessibility backend trait and platform stubs. |
+| `mkapk-win32` | Win32 windowing, Direct2D render backend, DirectWrite text, D3D11 GPU surface. |
+| `mkapk-mac` | AppKit/NSView windowing, CoreGraphics render backend (`drawRect:`-based `GuiPaintView`, with real mouse input), CoreText text, Metal GPU surface. |
+| `mkapk-standalone` | Standalone desktop host: real `cpal` audio I/O (input + output device selection, ring-buffer-bridged duplex capture/playback) and a real window, wired to any `Processor` + `PluginEditor` pair. |
+| `mkapk-vst3` | Real VST3 plugin entry point (`vst3_entry!` macro) gated by `VST3_SDK_PATH`, plus the `IPlugView` wrapper always available. |
+| `mkapk-au` | Real AUv2 plugin entry point (`au_entry!` macro, hand-written `AudioComponentPlugInInterface` dispatch over `au-sys`) plus an `AUCocoaUIBase`-ready Cocoa UI. |
+| `mkapk-aax` | Real AAX plugin entry point: a generic, plugin-agnostic C++ shim (`cpp/`) built by the AAX SDK's own CMake tooling, bridged into any `mkapk_host::Processor` via the `aax_entry!` macro and a page-table generator (`page_table` module); gated by `AAX_SDK_PATH`. Build-only stub without the SDK. |
+| `mkapk-test-host` | DAW-less standalone test host for rapid iteration. |
 | `xtask` | Build, bundle, sign, validate, and CI helper commands. |
 
 ## The reference plugin: `plugins/gain`
 
 ```
 plugins/gain/
-  build.rs            # mirrors gui-vst3's/gui-aax's VST3_SDK_PATH/AAX_SDK_PATH gates at this crate's own compile time
+  build.rs            # mirrors mkapk-vst3's/mkapk-aax's VST3_SDK_PATH/AAX_SDK_PATH gates at this crate's own compile time
   src/
-    processor.rs       # the one processor file — GainProcessor: gui_host::Processor
-    ui.rs               # the one UI file — GainEditor: gui_host::PluginEditor
+    processor.rs       # the one processor file — GainProcessor: mkapk_host::Processor
+    ui.rs               # the one UI file — GainEditor: mkapk_host::PluginEditor
     lib.rs               # ties them together; vst3_entry!/au_entry!/aax_entry! invocations behind cargo features
     bin/
-      standalone.rs      # gui_standalone::run(GainProcessor::new(), ..., GainEditor::new(...), ...)
+      standalone.rs      # mkapk_standalone::run(GainProcessor::new(), ..., GainEditor::new(...), ...)
       aax_page_table.rs  # prints this plugin's AAX page-table XML, for xtask to capture at build time
 ```
 
-Cargo features: `standalone` (pulls in `gui-standalone`), `vst3` (pulls in `gui-vst3`; needs `VST3_SDK_PATH` at build time for a real entry point), `au` (pulls in `gui-au`; macOS only, real entry point unconditionally), `aax` (pulls in `gui-aax`; needs `AAX_SDK_PATH` at build time for a real entry point).
+Cargo features: `standalone` (pulls in `mkapk-standalone`), `vst3` (pulls in `mkapk-vst3`; needs `VST3_SDK_PATH` at build time for a real entry point), `au` (pulls in `mkapk-au`; macOS only, real entry point unconditionally), `aax` (pulls in `mkapk-aax`; needs `AAX_SDK_PATH` at build time for a real entry point).
 
 ## Creating a new plugin
 
@@ -125,7 +125,7 @@ cargo test --workspace
 cargo xtask validate
 
 # Run the DAW-less test host with a blank editor
-cargo run -p gui-test-host --example blank -- --duration-ms 1000
+cargo run -p mkapk-test-host --example blank -- --duration-ms 1000
 
 # Run the Gain plugin standalone (real audio I/O + real window)
 cargo run -p gain-plugin --bin gain-standalone --features standalone
@@ -142,7 +142,7 @@ cargo build -p gain-plugin --features au
 AAX_SDK_PATH=/path/to/aax-sdk cargo build -p gain-plugin --features aax
 
 # Build the GPU surface example
-cargo run -p gui-test-host --example gpu-surface --features gpu-surface -- --duration-ms 1000
+cargo run -p mkapk-test-host --example gpu-surface --features gpu-surface -- --duration-ms 1000
 ```
 
 ### Bundling
@@ -185,22 +185,22 @@ Each frame the widget tree rebuilds a `CommandList` of `PaintCommand`s. The comm
 
 ### Rendering: real `drawRect:`, not `lockFocus`
 
-`gui-mac` draws through a custom `NSView` subclass (`GuiPaintView`) with a real `drawRect:` override, invoked by AppKit's own display cycle via `setNeedsDisplay:`. An earlier version drew directly into the host-provided view via `lockFocus`/`unlockFocus`; that succeeds at the API level (valid `CGContext`, no errors) but Apple has deprecated `lockFocus` since 10.14 because the WindowServer's Core Animation compositor isn't guaranteed to pick up content drawn that way — confirmed on real hardware (every draw call succeeded, nothing ever appeared on screen). The same view also owns real mouse input (`mouseDown:`/`mouseDragged:`/`mouseUp:`), forwarded through `PluginEditor::on_mouse_down`/`on_mouse_move`/`on_mouse_up`.
+`mkapk-mac` draws through a custom `NSView` subclass (`GuiPaintView`) with a real `drawRect:` override, invoked by AppKit's own display cycle via `setNeedsDisplay:`. An earlier version drew directly into the host-provided view via `lockFocus`/`unlockFocus`; that succeeds at the API level (valid `CGContext`, no errors) but Apple has deprecated `lockFocus` since 10.14 because the WindowServer's Core Animation compositor isn't guaranteed to pick up content drawn that way — confirmed on real hardware (every draw call succeeded, nothing ever appeared on screen). The same view also owns real mouse input (`mouseDown:`/`mouseDragged:`/`mouseUp:`), forwarded through `PluginEditor::on_mouse_down`/`on_mouse_move`/`on_mouse_up`.
 
 ### Parameter Gateway and Peak Meter
 
-`gui-host::LockFreeParameterGateway` provides bounded lock-free queues between the audio thread and the UI thread. Widgets call `begin_gesture`, `set_normalized`, and `end_gesture`; the audio thread pushes changes back via `send_from_audio`. `gui-host::PeakMeter` is the same idea in the other direction: a lock-free scalar the audio thread writes a real per-block peak level into, and the UI thread reads for level metering.
+`mkapk-host::LockFreeParameterGateway` provides bounded lock-free queues between the audio thread and the UI thread. Widgets call `begin_gesture`, `set_normalized`, and `end_gesture`; the audio thread pushes changes back via `send_from_audio`. `mkapk-host::PeakMeter` is the same idea in the other direction: a lock-free scalar the audio thread writes a real per-block peak level into, and the UI thread reads for level metering.
 
 ### Platform Backends
 
-The core is platform-agnostic. Platform crates translate `PaintCommand`s into Direct2D or CoreGraphics calls and native window events into `gui-core::Event`s. Unsafe code is isolated to the platform crates and gated with `#![deny(unsafe_code)]` in `gui-core`, `gui-host`, `gui-res`, `gui-accessibility`, `gui-widgets`, and `gui-standalone`.
+The core is platform-agnostic. Platform crates translate `PaintCommand`s into Direct2D or CoreGraphics calls and native window events into `mkapk-core::Event`s. Unsafe code is isolated to the platform crates and gated with `#![deny(unsafe_code)]` in `mkapk-core`, `mkapk-host`, `mkapk-res`, `mkapk-accessibility`, `mkapk-widgets`, and `mkapk-standalone`.
 
 ### AAX architecture: generic C++ shim + Rust processor
 
-Unlike VST3/AU, whose COM-vtable/C-ABI interfaces Rust implements directly, AAX's SDK is C++-only (`AAX_CEffectParameters` is an abstract C++ base class, not a plain C interface). That means AAX is the one format that genuinely needs a C++ layer — but that layer, in `crates/gui-aax/cpp/`, is **written once and reused for any plugin**, not hand-written per plugin:
+Unlike VST3/AU, whose COM-vtable/C-ABI interfaces Rust implements directly, AAX's SDK is C++-only (`AAX_CEffectParameters` is an abstract C++ base class, not a plain C interface). That means AAX is the one format that genuinely needs a C++ layer — but that layer, in `crates/mkapk-aax/cpp/`, is **written once and reused for any plugin**, not hand-written per plugin:
 
-- `AaxPlugin_Describe.cpp` / `AaxPlugin_Parameters.cpp` / `AaxPlugin_AlgProc.cpp` contain no plugin-specific identifiers or parameter names. At Describe/`EffectInit` time they loop over `extern "C"` getters (`gui_aax_parameter_count`/`_name`/`_default`/`_step_count`, plus plugin-identity getters) that Rust provides — up to a fixed capacity of 16 parameters (`gui_aax::component::MAX_PARAMS`, mirrored as `kAaxGeneric_MaxParams` in `cpp/gui_aax_bridge.h`).
-- All of those `extern "C"` functions, plus the real-time bridge `gui_aax_process_block`, are generated by one macro invocation: `gui_aax::aax_entry!` in `plugins/gain/src/lib.rs` — the same shape as `vst3_entry!`/`au_entry!`. A new plugin needs zero new C++.
+- `AaxPlugin_Describe.cpp` / `AaxPlugin_Parameters.cpp` / `AaxPlugin_AlgProc.cpp` contain no plugin-specific identifiers or parameter names. At Describe/`EffectInit` time they loop over `extern "C"` getters (`mkapk_aax_parameter_count`/`_name`/`_default`/`_step_count`, plus plugin-identity getters) that Rust provides — up to a fixed capacity of 16 parameters (`mkapk_aax::component::MAX_PARAMS`, mirrored as `kAaxGeneric_MaxParams` in `cpp/mkapk_aax_bridge.h`).
+- All of those `extern "C"` functions, plus the real-time bridge `mkapk_aax_process_block`, are generated by one macro invocation: `mkapk_aax::aax_entry!` in `plugins/gain/src/lib.rs` — the same shape as `vst3_entry!`/`au_entry!`. A new plugin needs zero new C++.
 - Each real-time block constructs a fresh, stack-allocated `Processor` (no boxing, no heap allocation) since AAX's packet dispatcher redelivers every parameter's current value on every block; a processor with real per-block state (e.g. a filter's delay line) would need AAX's private-data instance lifecycle instead, which this bridge doesn't implement.
 - AAX's one inherently per-plugin resource — the page-table XML mapping parameters to hardware-console knobs — is *generated*, not hand-maintained: `plugins/gain/src/bin/aax_page_table.rs` prints it from the same parameter metadata, and `cargo xtask bundle-aax` captures that output before invoking CMake.
 - Bypass is a real audio passthrough (`memcpy`), not "process with some neutral parameter value" — correct for any future processor, not just a pure-gain one.
@@ -209,7 +209,7 @@ The AAX SDK's own CMake tooling (`aax_plugin()` in `AAX_SDKFunctions.cmake`) com
 
 ### MIDI support
 
-`gui_host::Processor` has two MIDI-related methods, both defaulting to a no-op so existing effects don't need to change: `accepts_midi(&self) -> bool` (whether this processor wants MIDI at all) and `handle_midi(&mut self, message: MidiMessage)` (called once per queued channel-voice message — Note On/Off, Poly Pressure, Control Change, Program Change, Channel Pressure, Pitch Bend — before `process` each block, mirroring how parameter automation is already applied once per block rather than sample-accurately). `plugin_kind() -> PluginKind::{Effect, Instrument}` lets a processor declare itself an instrument (no audio input, driven entirely by MIDI notes) for hosts that distinguish the two.
+`mkapk_host::Processor` has two MIDI-related methods, both defaulting to a no-op so existing effects don't need to change: `accepts_midi(&self) -> bool` (whether this processor wants MIDI at all) and `handle_midi(&mut self, message: MidiMessage)` (called once per queued channel-voice message — Note On/Off, Poly Pressure, Control Change, Program Change, Channel Pressure, Pitch Bend — before `process` each block, mirroring how parameter automation is already applied once per block rather than sample-accurately). `plugin_kind() -> PluginKind::{Effect, Instrument}` lets a processor declare itself an instrument (no audio input, driven entirely by MIDI notes) for hosts that distinguish the two.
 
 `GainProcessor` demonstrates the automation half: MIDI CC 7 (Channel Volume) drives the same `gain` parameter its UI and host automation do (`handle_midi` matching `MidiMessage::ControlChange { controller: GAIN_MIDI_CC, .. }`). Real, format-specific wiring for all four targets:
 

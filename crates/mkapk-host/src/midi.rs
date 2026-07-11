@@ -1,7 +1,7 @@
 //! MIDI 1.0 channel-voice messages and a lock-free queue delivering them
 //! from whichever real-time MIDI source a format provides (a host's
 //! `IEventList`/`MusicDeviceMIDIEvent`/`AAX_IMIDINode` callback, or
-//! `gui-standalone`'s own MIDI input thread) into `Processor::handle_midi`.
+//! `mkapk-standalone`'s own MIDI input thread) into `Processor::handle_midi`.
 use crate::processor::Processor;
 
 /// One MIDI 1.0 channel-voice message. `channel` is 0-based (`0..=15`).
@@ -171,7 +171,7 @@ impl MidiMessage {
 /// A bounded, lock-free single-producer/single-consumer-style queue
 /// carrying MIDI messages from whichever thread a format's real-time MIDI
 /// source runs on (a host's audio thread calling into the plugin directly,
-/// or `gui-standalone`'s dedicated MIDI input thread) to the audio
+/// or `mkapk-standalone`'s dedicated MIDI input thread) to the audio
 /// callback. Mirrors `LockFreeParameterGateway`'s shape but one-directional
 /// (there's no UI-thread MIDI reader in this workspace).
 pub struct MidiEventQueue {

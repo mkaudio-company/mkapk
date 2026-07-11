@@ -1,5 +1,5 @@
 [package]
-name = "gui-vst3"
+name = "mkapk-vst3"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,8 +12,8 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
-gui-core = { workspace = true }
-gui-host = { workspace = true }
+mkapk-core = { workspace = true }
+mkapk-host = { workspace = true }
 vst3-sys = { git = "https://github.com/RustAudio/vst3-sys", optional = true }
 vst3-com = { git = "https://github.com/RustAudio/vst3-sys", optional = true }
 

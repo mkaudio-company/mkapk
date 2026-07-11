@@ -1,4 +1,4 @@
-use gui_host::{EditorHost, ParentWindowHandle, PluginEditor};
+use mkapk_host::{EditorHost, ParentWindowHandle, PluginEditor};
 
 #[cfg(target_os = "windows")]
 use std::ptr::null_mut;
@@ -18,7 +18,7 @@ struct EditorWindowState {
     editor: Box<dyn PluginEditor>,
     #[allow(dead_code)]
     host: Box<dyn EditorHost>,
-    size: gui_core::Sizef,
+    size: mkapk_core::Sizef,
 }
 
 #[cfg(target_os = "windows")]
@@ -97,7 +97,7 @@ impl Win32Window {
             return None;
         }
 
-        let size = gui_core::Sizef::new(width as f32, height as f32);
+        let size = mkapk_core::Sizef::new(width as f32, height as f32);
         let state = Box::new(EditorWindowState { editor, host, size });
         unsafe {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
@@ -113,16 +113,16 @@ impl Win32Window {
         }
     }
 
-    pub fn client_size(&self) -> gui_core::Sizef {
+    pub fn client_size(&self) -> mkapk_core::Sizef {
         unsafe {
             let mut rect = RECT::default();
             if GetClientRect(self.hwnd, &mut rect).is_ok() {
-                gui_core::Sizef::new(
+                mkapk_core::Sizef::new(
                     (rect.right - rect.left) as f32,
                     (rect.bottom - rect.top) as f32,
                 )
             } else {
-                gui_core::Sizef::new(0.0, 0.0)
+                mkapk_core::Sizef::new(0.0, 0.0)
             }
         }
     }
@@ -149,8 +149,8 @@ impl Win32Window {
 
     pub fn request_repaint(&self) {}
 
-    pub fn client_size(&self) -> gui_core::Sizef {
-        gui_core::Sizef::new(0.0, 0.0)
+    pub fn client_size(&self) -> mkapk_core::Sizef {
+        mkapk_core::Sizef::new(0.0, 0.0)
     }
 
     pub fn dpi(&self) -> u32 {
@@ -171,7 +171,7 @@ unsafe extern "system" fn wnd_proc(
             if !state.is_null() {
                 let mut rect = RECT::default();
                 if GetClientRect(hwnd, &mut rect).is_ok() {
-                    let size = gui_core::Sizef::new(
+                    let size = mkapk_core::Sizef::new(
                         (rect.right - rect.left) as f32,
                         (rect.bottom - rect.top) as f32,
                     );

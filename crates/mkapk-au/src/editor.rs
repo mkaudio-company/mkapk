@@ -1,7 +1,7 @@
 use core::ffi::c_void;
 use std::ptr;
 
-use gui_host::PluginEditor;
+use mkapk_host::PluginEditor;
 
 pub struct AuEditor {
     editor: Box<dyn PluginEditor>,
@@ -48,8 +48,8 @@ mod macos {
     use super::*;
     use cocoa::base::{id, nil};
     use cocoa::foundation::{NSPoint, NSRect, NSSize};
-    use gui_core::Sizef;
-    use gui_host::{EditorHost, NormalizedValue, ParameterId, ParentWindowHandle};
+    use mkapk_core::Sizef;
+    use mkapk_host::{EditorHost, NormalizedValue, ParameterId, ParentWindowHandle};
     use objc::declare::ClassDecl;
     use objc::runtime::{Class, Object, Protocol, Sel};
     use objc::{class, msg_send, sel};
@@ -332,8 +332,8 @@ pub fn get_cocoa_view_info() -> AuCocoaViewInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gui_core::Sizef;
-    use gui_host::{
+    use mkapk_core::Sizef;
+    use mkapk_host::{
         EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor, SizeConstraints,
     };
 
@@ -358,11 +358,11 @@ mod tests {
 
     #[test]
     fn slider_mouse_down_invokes_parameter_callback() {
-        use gui_core::{
+        use mkapk_core::{
             Event, EventDispatcher, EventResponse, LayoutConstraints, LayoutEngine, LayoutNode,
             Modifiers, MouseButton, MouseEvent, Pointf, Rectf, Tree, Widget,
         };
-        use gui_widgets::{Slider, Theme};
+        use mkapk_widgets::{Slider, Theme};
         use std::cell::RefCell;
         use std::rc::Rc;
 
@@ -396,7 +396,8 @@ mod tests {
         let layout_box = layout.get(slider_id).unwrap();
         let slider_node = tree.find(slider_id).unwrap();
         let widget = slider_node.widget.borrow();
-        let slider_ref = gui_core::downcast_widget_ref::<gui_widgets::Slider>(&**widget).unwrap();
+        let slider_ref =
+            mkapk_core::downcast_widget_ref::<mkapk_widgets::Slider>(&**widget).unwrap();
         slider_ref.set_frame(Rectf::new(layout_box.origin, layout_box.size));
         drop(widget);
 

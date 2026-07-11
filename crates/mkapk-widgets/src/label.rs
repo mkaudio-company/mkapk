@@ -1,6 +1,6 @@
 use core::cell::Cell;
 
-use gui_core::{
+use mkapk_core::{
     AccessibilityNode, CommandList, LayoutConstraints, PaintCommand, Pointf, Rectf, Role, Sizef,
     TextLayoutId, Widget, WidgetId,
 };

@@ -1,7 +1,7 @@
 //! A real AUv2 plugin entry point: `AudioComponentFactoryFunction` +
 //! `AudioComponentPlugInInterface` vtable (`Open`/`Close`/`Lookup`), backed
 //! by `au-sys`'s hand-written bindings to the C API (the AU equivalent of
-//! what `vst3-sys` gives `gui-vst3`, minus a higher-level dispatch macro --
+//! what `vst3-sys` gives `mkapk-vst3`, minus a higher-level dispatch macro --
 //! there isn't one for AUv2, so the vtable dispatch here is hand-written).
 //!
 //! Scope: a minimal, real, `kAudioUnitType_Effect`-style Audio Unit --
@@ -11,7 +11,7 @@
 //! render real audio through it: `Initialize`/`Uninitialize`/`Reset`,
 //! stream format, parameter list/info, supported channel counts, max
 //! frames per slice, the render callback used to pull input (the AUv2
-//! "pull" model), `Render` itself, and `CocoaUI` (wired to `gui-au`'s
+//! "pull" model), `Render` itself, and `CocoaUI` (wired to `mkapk-au`'s
 //! existing Cocoa view code via a small private property -- see
 //! `editor.rs`'s `AUCocoaUIBase` factory class).
 //!
@@ -58,7 +58,7 @@ use std::mem;
 use std::path::Path;
 use std::sync::Arc;
 
-use gui_host::{
+use mkapk_host::{
     LockFreeParameterGateway, MidiEventQueue, MidiMessage, NormalizedValue, ParameterGateway,
     ParameterId, ParameterInfo, PeakMeter, PluginEditor, Processor, apply_pending_midi,
     apply_pending_parameters,
@@ -1331,7 +1331,7 @@ where
 /// [`K_GUI_HOST_STATE_PROPERTY`].
 ///
 /// Returns `None` if `instance_ptr` is null or the editor was already
-/// created once before (this crate, like `gui-vst3`, only supports
+/// created once before (this crate, like `mkapk-vst3`, only supports
 /// constructing the editor a single time per instance).
 ///
 /// # Safety
@@ -1350,7 +1350,7 @@ pub(crate) unsafe fn build_editor(instance_ptr: *mut c_void) -> Option<Box<dyn P
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gui_host::{ChannelLayout, PluginEditor, SizeConstraints};
+    use mkapk_host::{ChannelLayout, PluginEditor, SizeConstraints};
 
     const GAIN_PARAM: ParameterId = ParameterId(1);
 
@@ -1403,12 +1403,12 @@ mod tests {
     impl PluginEditor for NoOpEditor {
         fn open(
             &mut self,
-            _parent: gui_host::ParentWindowHandle,
-            _host: &dyn gui_host::EditorHost,
+            _parent: mkapk_host::ParentWindowHandle,
+            _host: &dyn mkapk_host::EditorHost,
         ) {
         }
         fn close(&mut self) {}
-        fn resize(&mut self, _size: gui_core::Sizef) {}
+        fn resize(&mut self, _size: mkapk_core::Sizef) {}
         fn idle(&mut self) {}
         fn on_parameter_changed(&mut self, _id: ParameterId, _value: NormalizedValue) {}
         fn size_constraints(&self) -> SizeConstraints {

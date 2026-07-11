@@ -1,5 +1,5 @@
 [package]
-name = "gui-accessibility"
+name = "mkapk-accessibility"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,15 +12,15 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
-gui-core = { workspace = true }
+mkapk-core = { workspace = true }
 
 [features]
 default = []
 backend = []
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
-gui-test-host = { workspace = true }
-gui-mac = { workspace = true }
+mkapk-test-host = { workspace = true }
+mkapk-mac = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
-gui-win32 = { workspace = true }
+mkapk-win32 = { workspace = true }

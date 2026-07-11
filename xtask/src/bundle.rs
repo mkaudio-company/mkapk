@@ -11,7 +11,7 @@
 //! never requires editing this file.
 //!
 //! Each format's real plugin entry point is gated (VST3 by `VST3_SDK_PATH`
-//! at `gui-vst3` build time; AU is ungated on macOS) -- when the gate isn't
+//! at `mkapk-vst3` build time; AU is ungated on macOS) -- when the gate isn't
 //! set, the crate still builds, but exports no factory symbol, so the
 //! assembled bundle is packaging/signing plumbing only, not yet
 //! DAW-scannable. This is checked for real (via `nm`) rather than assumed,
@@ -155,7 +155,7 @@ fn resolve_au_component_type(target: &PluginTarget) -> String {
 /// The `AudioComponents` array AU hosts read to discover this plugin
 /// without loading it first: type/subtype/manufacturer four-character
 /// codes and the `factoryFunction` symbol name, which must match the
-/// plugin's own `gui_au::au_entry!` invocation exactly.
+/// plugin's own `mkapk_au::au_entry!` invocation exactly.
 ///
 /// `component_type` (`aufx`/`aumf`/`aumu`) matters for real MIDI delivery:
 /// AU hosts only ever route MIDI to a Music Effect/Music Device component,

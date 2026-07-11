@@ -7,7 +7,7 @@ fn main() {
             println!("cargo:rustc-link-search=native={}/Libs", path);
         }
         Err(_) => {
-            println!("cargo:warning=AAX_SDK_PATH not set; building gui-aax as a no-op stub.");
+            println!("cargo:warning=AAX_SDK_PATH not set; building mkapk-aax as a no-op stub.");
         }
     }
 }

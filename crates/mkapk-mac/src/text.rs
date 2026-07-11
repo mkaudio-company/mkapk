@@ -1,6 +1,6 @@
 #![allow(unexpected_cfgs)]
 
-use gui_core::{Pointf, Sizef, TextLayoutId};
+use mkapk_core::{Pointf, Sizef, TextLayoutId};
 
 #[cfg(target_os = "macos")]
 use core_foundation::attributed_string::CFMutableAttributedString;

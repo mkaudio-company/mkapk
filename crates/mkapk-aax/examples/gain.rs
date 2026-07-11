@@ -3,15 +3,15 @@
 use std::cell::Cell;
 use std::sync::Arc;
 
-use gui_core::{
+use mkapk_core::{
     CommandList, LayoutConstraints, LayoutDirection, LayoutEngine, LayoutNode, LayoutResult,
     PaintCommand, Rectf, Sizef, TraverseOrder, Tree, Widget, WidgetId, downcast_widget_ref,
 };
-use gui_host::{
+use mkapk_host::{
     EditorHost, LockFreeParameterGateway, NormalizedValue, ParameterGateway, ParameterId,
     ParentWindowHandle, PluginEditor, SizeConstraints,
 };
-use gui_widgets::{Label, Slider, Theme};
+use mkapk_widgets::{Label, Slider, Theme};
 
 struct Panel {
     id: WidgetId,
@@ -106,7 +106,7 @@ impl GainEditor {
             ..LayoutNode::default()
         });
 
-        let margin = gui_core::Insetsf::uniform(4.0);
+        let margin = mkapk_core::Insetsf::uniform(4.0);
         for &id in &[label_id, slider_id] {
             layout_engine.set_node(LayoutNode {
                 id,
@@ -218,7 +218,7 @@ fn main() {
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 fn run(parent: ParentWindowHandle) {
     let editor = GainEditor::new();
-    let mut aax_editor = gui_aax::AaxEditor::new(Box::new(editor));
+    let mut aax_editor = mkapk_aax::AaxEditor::new(Box::new(editor));
     aax_editor.create_view(parent).unwrap();
     let _ = aax_editor.view_size();
     aax_editor.timer_wakeup();

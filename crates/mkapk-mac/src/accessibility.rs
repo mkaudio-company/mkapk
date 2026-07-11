@@ -1,11 +1,11 @@
-//! Real `NSAccessibility` bridging: mirrors a `gui_core::AccessibilityTree`
+//! Real `NSAccessibility` bridging: mirrors a `mkapk_core::AccessibilityTree`
 //! into a tree of `NSAccessibilityElement` proxy objects and attaches it to
 //! a live `NSView`, so external tools (VoiceOver, Accessibility Inspector)
 //! can query widget roles/labels/values.
 #![allow(unexpected_cfgs)]
 
 #[cfg(not(target_os = "macos"))]
-use gui_core::AccessibilityTree;
+use mkapk_core::AccessibilityTree;
 
 #[cfg(target_os = "macos")]
 mod macos {
@@ -15,7 +15,7 @@ mod macos {
 
     use cocoa::base::{id, nil};
     use cocoa::foundation::{NSPoint, NSRect, NSSize, NSString};
-    use gui_core::{AccessibilityNode, AccessibilityTree, Rectf, Role};
+    use mkapk_core::{AccessibilityNode, AccessibilityTree, Rectf, Role};
     use objc::declare::ClassDecl;
     use objc::rc::StrongPtr;
     use objc::runtime::{BOOL, Class, NO, Object, Sel, YES};
@@ -190,7 +190,7 @@ mod macos {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use gui_core::{Pointf, Sizef, WidgetId};
+        use mkapk_core::{Pointf, Sizef, WidgetId};
 
         unsafe fn nsstring_to_string(s: id) -> String {
             unsafe {

@@ -1,6 +1,6 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
-use gui_core::{Color, CommandList, PaintCommand, Pointf, Rectf, Sizef};
+use mkapk_core::{Color, CommandList, PaintCommand, Pointf, Rectf, Sizef};
 
 const COUNT: usize = 10_000;
 

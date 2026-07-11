@@ -1,5 +1,5 @@
 [package]
-name = "gui-standalone"
+name = "mkapk-standalone"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,9 +12,9 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
-gui-core = { workspace = true }
-gui-host = { workspace = true }
-gui-test-host = { workspace = true }
+mkapk-core = { workspace = true }
+mkapk-host = { workspace = true }
+mkapk-test-host = { workspace = true }
 cpal = "0.15"
 ringbuf = "0.5"
 # Real MIDI input, same reasoning as cpal for audio: device enumeration and

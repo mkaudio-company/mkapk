@@ -1,5 +1,5 @@
 /// Generic AAX_CEffectParameters implementation: registers Master Bypass
-/// plus whatever parameters `gui_aax_parameter_count()`/`_name`/`_default`/
+/// plus whatever parameters `mkapk_aax_parameter_count()`/`_name`/`_default`/
 /// `_step_count` report, with no plugin-specific code. See
 /// `AaxPlugin_Parameters.cpp` -- there are no per-parameter callback methods
 /// to declare here because AAX_CPacketDispatcher::RegisterPacket's default

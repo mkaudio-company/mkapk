@@ -1,7 +1,7 @@
 #![allow(unexpected_cfgs, deprecated)]
 
-use gui_core::{GpuContext, GpuSurface, Pointf, Rectf, Sizef};
-use gui_host::{
+use mkapk_core::{GpuContext, GpuSurface, Pointf, Rectf, Sizef};
+use mkapk_host::{
     EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor, SizeConstraints,
 };
 
@@ -18,11 +18,11 @@ impl GpuEditor {
         surface.on_render(|ctx| match ctx {
             #[cfg(target_os = "windows")]
             GpuContext::D3D11(ctx) => {
-                gui_win32::clear_render_target(ctx, [0.05, 0.05, 0.2, 1.0]);
+                mkapk_win32::clear_render_target(ctx, [0.05, 0.05, 0.2, 1.0]);
             }
             #[cfg(target_os = "macos")]
             GpuContext::Metal(ctx) => {
-                gui_mac::clear_to_color(ctx, 0.05, 0.05, 0.2, 1.0);
+                mkapk_mac::clear_to_color(ctx, 0.05, 0.05, 0.2, 1.0);
             }
             _ => {}
         });
@@ -59,11 +59,11 @@ impl PluginEditor for GpuEditor {
 
         #[cfg(target_os = "macos")]
         {
-            gui_mac::render_gpu_surface_to_view(self.view, self.size, &mut callback);
+            mkapk_mac::render_gpu_surface_to_view(self.view, self.size, &mut callback);
         }
         #[cfg(target_os = "windows")]
         {
-            gui_win32::render_gpu_surface_to_hwnd(self.view, self.size, &mut callback);
+            mkapk_win32::render_gpu_surface_to_hwnd(self.view, self.size, &mut callback);
         }
     }
 
@@ -75,5 +75,5 @@ impl PluginEditor for GpuEditor {
 }
 
 fn main() {
-    gui_test_host::run_test_host_with_editor(1000, 400, 300, GpuEditor::new());
+    mkapk_test_host::run_test_host_with_editor(1000, 400, 300, GpuEditor::new());
 }

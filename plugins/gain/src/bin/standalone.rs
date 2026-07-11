@@ -4,8 +4,8 @@
 use std::sync::Arc;
 
 use gain_plugin::{GainEditor, GainProcessor};
-use gui_host::{LockFreeParameterGateway, PeakMeter};
-use gui_standalone::StandaloneConfig;
+use mkapk_host::{LockFreeParameterGateway, PeakMeter};
+use mkapk_standalone::StandaloneConfig;
 
 fn main() {
     let gateway = Arc::new(LockFreeParameterGateway::default());
@@ -13,7 +13,7 @@ fn main() {
     let processor = GainProcessor::new();
     let editor = GainEditor::new(gateway.clone(), meter.clone());
 
-    gui_standalone::run(
+    mkapk_standalone::run(
         processor,
         gateway,
         meter,

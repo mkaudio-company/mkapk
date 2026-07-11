@@ -1,7 +1,7 @@
 #![allow(unexpected_cfgs, deprecated)]
 
-use gui_core::{CommandList, PaintCommand, Pointf, Sizef, TextLayoutId};
-use gui_host::{
+use mkapk_core::{CommandList, PaintCommand, Pointf, Sizef, TextLayoutId};
+use mkapk_host::{
     EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor, SizeConstraints,
 };
 
@@ -14,7 +14,7 @@ struct TextEditor {
     size: Sizef,
     scale: f32,
     #[cfg(target_os = "macos")]
-    layout: gui_mac::TextLayout,
+    layout: mkapk_mac::TextLayout,
 }
 
 impl TextEditor {
@@ -24,7 +24,7 @@ impl TextEditor {
             size: Sizef::new(400.0, 300.0),
             scale: 1.0,
             #[cfg(target_os = "macos")]
-            layout: gui_mac::TextLayout::new("Hello 世界 🎹", 24.0),
+            layout: mkapk_mac::TextLayout::new("Hello 世界 🎹", 24.0),
         }
     }
 }
@@ -72,12 +72,18 @@ impl PluginEditor for TextEditor {
 
     fn idle(&mut self) {
         let commands = build_commands(self.size);
-        gui_mac::render_to_view(self.view, self.size, self.scale, &commands);
+        mkapk_mac::render_to_view(self.view, self.size, self.scale, &commands);
 
         #[cfg(target_os = "macos")]
         {
             let position = Pointf::new(20.0, 20.0);
-            gui_mac::render_text_to_view(self.view, self.size, self.scale, &self.layout, position);
+            mkapk_mac::render_text_to_view(
+                self.view,
+                self.size,
+                self.scale,
+                &self.layout,
+                position,
+            );
         }
     }
 
@@ -92,15 +98,15 @@ fn build_commands(size: Sizef) -> CommandList {
     let mut commands = CommandList::new();
 
     commands.push(PaintCommand::Clear {
-        color: gui_core::Color::new(40, 40, 40, 255),
+        color: mkapk_core::Color::new(40, 40, 40, 255),
     });
 
     commands.push(PaintCommand::FillRect {
-        rect: gui_core::Rectf::new(
+        rect: mkapk_core::Rectf::new(
             Pointf::new(10.0, 10.0),
             Sizef::new(size.width - 20.0, size.height - 20.0),
         ),
-        color: gui_core::Color::new(60, 60, 60, 255),
+        color: mkapk_core::Color::new(60, 60, 60, 255),
     });
 
     commands.push(PaintCommand::DrawText {
@@ -112,5 +118,5 @@ fn build_commands(size: Sizef) -> CommandList {
 }
 
 fn main() {
-    gui_test_host::run_test_host_with_editor(1000, 400, 300, TextEditor::new());
+    mkapk_test_host::run_test_host_with_editor(1000, 400, 300, TextEditor::new());
 }

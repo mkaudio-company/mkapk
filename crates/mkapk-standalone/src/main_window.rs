@@ -1,7 +1,7 @@
 //! Creates the standalone app's main window via `mkgraphic` (so the window
 //! chrome -- the actual `NSWindow` -- comes from mkgraphic), while the
 //! plugin content view attached inside it is created and rendered by this
-//! project's own CoreGraphics pipeline (`gui-mac`), not mkgraphic's own
+//! project's own CoreGraphics pipeline (`mkapk-mac`), not mkgraphic's own
 //! tiny-skia element tree. The two libraries' Objective-C bindings
 //! (`objc2` for mkgraphic, the legacy `objc`/`cocoa` crates used elsewhere
 //! in this project) both just message the same underlying, single
@@ -18,7 +18,7 @@ use core::ffi::c_void;
 use cocoa::appkit::{NSApplication, NSEventMask, NSView};
 use cocoa::base::{BOOL, NO, YES, id, nil};
 use cocoa::foundation::{NSDefaultRunLoopMode, NSPoint, NSRect, NSSize};
-use gui_host::ParentWindowHandle;
+use mkapk_host::ParentWindowHandle;
 use mkgraphic::prelude::{App, Extent, Window};
 use objc::runtime::Class;
 
@@ -71,7 +71,7 @@ impl MainWindow {
 
     /// Pumps the shared `NSApplication` event queue (the same singleton
     /// mkgraphic's own window belongs to) and reports whether this window
-    /// is still visible. Mirrors `gui-test-host`'s `PlatformWindow::pump_events`.
+    /// is still visible. Mirrors `mkapk-test-host`'s `PlatformWindow::pump_events`.
     pub fn pump_events(&self) -> bool {
         unsafe {
             let pool: id = msg_send![

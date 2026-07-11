@@ -2,7 +2,7 @@
 #include "AaxPlugin_Alg.h"
 #include "AaxPlugin_Describe.h"
 #include "AaxPlugin_Parameters.h"
-#include "gui_aax_bridge.h"
+#include "mkapk_aax_bridge.h"
 
 // AAX Includes
 #include "AAX_Assert.h"
@@ -21,7 +21,7 @@
 // own ports.
 //
 // Registers all kAaxGeneric_MaxParams slots unconditionally -- not just the
-// `gui_aax_parameter_count()` actually in use -- because the real AAX
+// `mkapk_aax_parameter_count()` actually in use -- because the real AAX
 // Plug-In Validator (`test.load_unload`) warns "Algorithm context contains
 // gaps between registered fields" when SAaxGeneric_Alg_Context declares
 // more pointer slots than are registered as ports (confirmed empirically).
@@ -45,13 +45,13 @@ static void DescribeAlgorithmComponent(AAX_IComponentDescriptor* outDesc)
     }
 
     // Only registered when the processor actually wants MIDI (see
-    // `gui_host::Processor::accepts_midi`) -- unlike the parameter slots
+    // `mkapk_host::Processor::accepts_midi`) -- unlike the parameter slots
     // above, a plain effect with no use for MIDI shouldn't show a "MIDI In"
     // node in the host at all. Native-only (per this shim's own scope):
     // the AAX SDK's own docs note MIDI isn't delivered to DSP algorithms,
     // only AAX Native, which is exactly what `Gain_Defs.h`'s FourCC-only
     // (no TI) identity already committed to.
-    if (gui_aax_accepts_midi())
+    if (mkapk_aax_accepts_midi())
     {
         err = outDesc->AddMIDINode(eAlgPortID_MIDINodeIn, AAX_eMIDINodeType_LocalInput, "MIDI In",
                                     0xFFFF);
@@ -61,15 +61,15 @@ static void DescribeAlgorithmComponent(AAX_IComponentDescriptor* outDesc)
     if (!properties)
         err = AAX_ERROR_NULL_OBJECT;
 
-    err = properties->AddProperty(AAX_eProperty_ManufacturerID, gui_aax_manufacturer_id());
-    err = properties->AddProperty(AAX_eProperty_ProductID, gui_aax_product_id());
+    err = properties->AddProperty(AAX_eProperty_ManufacturerID, mkapk_aax_manufacturer_id());
+    err = properties->AddProperty(AAX_eProperty_ProductID, mkapk_aax_product_id());
     err = properties->AddProperty(AAX_eProperty_CanBypass, true);
     err = properties->AddProperty(AAX_eProperty_UsesClientGUI, true);  // Host's generic (auto) GUI
 
     err = properties->AddProperty(AAX_eProperty_InputStemFormat, AAX_eStemFormat_Mono);
     err = properties->AddProperty(AAX_eProperty_OutputStemFormat, AAX_eStemFormat_Mono);
 
-    err = properties->AddProperty(AAX_eProperty_PlugInID_Native, gui_aax_plugin_id_native());
+    err = properties->AddProperty(AAX_eProperty_PlugInID_Native, mkapk_aax_plugin_id_native());
 
     err = properties->AddPointerProperty(AAX_eProperty_NativeProcessProc,
                                           reinterpret_cast<const void*>(&AaxGeneric_AlgorithmProcessFunction));
@@ -87,7 +87,7 @@ static AAX_Result DescribeEffect(AAX_IEffectDescriptor* outDescriptor)
     if (!compDesc)
         err = AAX_ERROR_NULL_OBJECT;
 
-    err = outDescriptor->AddName(reinterpret_cast<const char*>(gui_aax_plugin_name()));
+    err = outDescriptor->AddName(reinterpret_cast<const char*>(mkapk_aax_plugin_name()));
     err = outDescriptor->AddCategory(AAX_ePlugInCategory_Effect);
 
     err = compDesc->Clear();
@@ -100,7 +100,7 @@ static AAX_Result DescribeEffect(AAX_IEffectDescriptor* outDescriptor)
     // The page table's content is per-plugin (its knobIDs are
     // parameter-name-specific), but the file *name* is a fixed convention
     // ("GeneratedPages.xml") -- xtask generates its content at build time
-    // (see gui-aax's `page_table` module) rather than a plugin
+    // (see mkapk-aax's `page_table` module) rather than a plugin
     // hand-maintaining a static XML resource. Confirmed via the real AAX
     // Plug-In Validator that omitting this resource entirely fails
     // test.parameter_traversal.linear ("Failed to load page tables
@@ -139,14 +139,14 @@ AAX_Result GetEffectDescriptions(AAX_ICollection* outCollection)
     if (plugInDescriptor)
     {
         AAX_SWALLOW_MULT(err = DescribeEffect(plugInDescriptor);
-                          err = outCollection->AddEffect(reinterpret_cast<const char*>(gui_aax_effect_id()),
+                          err = outCollection->AddEffect(reinterpret_cast<const char*>(mkapk_aax_effect_id()),
                                                           plugInDescriptor););
     }
     else
         err = AAX_ERROR_NULL_OBJECT;
 
-    err = outCollection->SetManufacturerName(reinterpret_cast<const char*>(gui_aax_manufacturer_name()));
-    err = outCollection->AddPackageName(reinterpret_cast<const char*>(gui_aax_plugin_name()));
+    err = outCollection->SetManufacturerName(reinterpret_cast<const char*>(mkapk_aax_manufacturer_name()));
+    err = outCollection->AddPackageName(reinterpret_cast<const char*>(mkapk_aax_plugin_name()));
     err = outCollection->SetPackageVersion(1);
 
     return err;

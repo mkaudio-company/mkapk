@@ -6,7 +6,7 @@
 //! fixed constant the way the other format bundlers are, since it depends
 //! on `GainProcessor::accepts_midi`/`plugin_kind`, which only exist as
 //! runtime methods on the concrete processor.
-use gui_host::{PluginKind, Processor as _};
+use mkapk_host::{PluginKind, Processor as _};
 
 fn main() {
     let processor = gain_plugin::GainProcessor::new();

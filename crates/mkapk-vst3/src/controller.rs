@@ -1,5 +1,5 @@
 //! Real VST3 `IEditController` implementation, bridging any
-//! `gui_host::PluginEditor` (constructed with a shared
+//! `mkapk_host::PluginEditor` (constructed with a shared
 //! `LockFreeParameterGateway`) into VST3's edit-controller contract. Reuses
 //! the existing `PluginView` (`crate::view`) for `create_view`.
 //!
@@ -23,8 +23,8 @@ use std::os::raw::c_void;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use gui_core::Sizef;
-use gui_host::{
+use mkapk_core::Sizef;
+use mkapk_host::{
     EditorHost, LockFreeParameterGateway, NormalizedValue, ParameterId, ParameterInfo,
     ParameterMessage, ParentWindowHandle, PluginEditor, SizeConstraints,
 };
@@ -87,7 +87,7 @@ impl PluginEditor for HostNotifyingEditor {
 
 type EditorFactory = Box<dyn FnOnce(Arc<LockFreeParameterGateway>) -> Box<dyn PluginEditor>>;
 
-/// Real `IEditController` bridging a `gui_host::PluginEditor` factory
+/// Real `IEditController` bridging a `mkapk_host::PluginEditor` factory
 /// closure into VST3's controller contract. Also implements `IMidiMapping`
 /// so hosts can route a MIDI CC directly to a parameter's own automation
 /// lane -- VST3's idiomatic mechanism for MIDI-CC automation (there is no

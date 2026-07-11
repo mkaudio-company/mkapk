@@ -1,5 +1,5 @@
 [package]
-name = "gui-host"
+name = "mkapk-host"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,4 +13,4 @@ keywords.workspace = true
 
 [dependencies]
 crossbeam-channel = "0.5"
-gui-core = { workspace = true }
+mkapk-core = { workspace = true }

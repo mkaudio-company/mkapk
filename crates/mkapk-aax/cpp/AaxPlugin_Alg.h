@@ -1,10 +1,10 @@
-/// Real-time algorithm context, generic across any `gui_host::Processor`
+/// Real-time algorithm context, generic across any `mkapk_host::Processor`
 /// with at most `kAaxGeneric_MaxParams` parameters -- modeled on the shape
 /// of the AAX SDK's own `DemoGain_Alg.h`, but with a fixed array of
 /// parameter-value slots instead of one hand-named field per parameter.
 ///
 /// The actual per-sample math lives in Rust (whichever `Processor` the
-/// plugin project built, via `gui_aax_process_block`), not here: this file
+/// plugin project built, via `mkapk_aax_process_block`), not here: this file
 /// only describes the real-time data AAX delivers into/out of that call.
 #pragma once
 #ifndef AAXPLUGIN_ALG_H
@@ -12,7 +12,7 @@
 
 #include "AAX.h"
 #include "AAX_IMIDINode.h"
-#include "gui_aax_bridge.h"
+#include "mkapk_aax_bridge.h"
 
 enum EAaxGeneric_MeterTaps
 {
@@ -34,11 +34,11 @@ constexpr AAX_CTypeID kAaxGeneric_MeterID[eMeterTap_Count] = {
 #include AAX_ALIGN_FILE_ALG
 #include AAX_ALIGN_FILE_END
 // Context structure. `mParamValueP` holds one pointer per registered
-// parameter packet; only the first `gui_aax_parameter_count()` entries are
+// parameter packet; only the first `mkapk_aax_parameter_count()` entries are
 // ever read (all context fields are declared up-front because AAX's field
 // indices are computed at compile time from this struct's layout, but
 // unused trailing slots are simply never dereferenced). `mMIDINodeInP` is
-// only populated by AAX (via `AddMIDINode`) when `gui_aax_accepts_midi()`
+// only populated by AAX (via `AddMIDINode`) when `mkapk_aax_accepts_midi()`
 // is true -- reading it otherwise would dereference an AAX-side field that
 // was never wired up, so `AaxGeneric_AlgorithmProcessFunction` gates on the
 // same getter before touching it.

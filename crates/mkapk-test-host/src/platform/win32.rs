@@ -2,8 +2,8 @@
 
 use std::ptr::null_mut;
 
-use gui_core::{Event, Modifiers, MouseButton, MouseEvent, PointerEvent, Pointf};
-use gui_host::ParentWindowHandle;
+use mkapk_core::{Event, Modifiers, MouseButton, MouseEvent, PointerEvent, Pointf};
+use mkapk_host::ParentWindowHandle;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{GetStockObject, HBRUSH, WHITE_BRUSH};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -21,7 +21,7 @@ use windows::core::PCWSTR;
 /// `GWLP_USERDATA` on the host window (double-boxed so the raw pointer
 /// stashed there stays a single machine word, since `Box<dyn FnMut(..)>`
 /// alone is a fat pointer and won't fit).
-pub type InputSink = Box<dyn FnMut(Event) -> gui_core::EventResponse>;
+pub type InputSink = Box<dyn FnMut(Event) -> mkapk_core::EventResponse>;
 
 pub struct PlatformWindow {
     hwnd: HWND,

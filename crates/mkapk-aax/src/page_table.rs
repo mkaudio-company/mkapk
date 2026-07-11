@@ -14,7 +14,7 @@
 //! callable from a plugin's own small build-time binary (see
 //! `plugins/gain/src/bin/aax_page_table.rs`) without needing the AAX SDK
 //! present.
-use gui_host::ParameterInfo;
+use mkapk_host::ParameterInfo;
 
 /// The same plugin-identity FourCC values passed to `aax_entry!` -- kept as
 /// plain data here (rather than only inside the generated `extern "C"`
@@ -67,7 +67,7 @@ pub fn generate_page_table_xml(
          <PageTables vers='6.4.0.89'>\n\
          \t<PageTableLayouts>\n\
          \t\t<Plugin manID='{man_id}' prodID='{prod_id}' plugID='{plug_id}'>\n\
-         \t\t\t<Desc>{name} mkaudio.gui_aax generic layout</Desc>\n\
+         \t\t\t<Desc>{name} mkaudio.mkapk_aax generic layout</Desc>\n\
          \t\t\t<Layout>StandardLayout</Layout>\n\
          \t\t</Plugin>\n\
          \t\t<PTLayout name='StandardLayout'>\n\
@@ -84,7 +84,7 @@ pub fn generate_page_table_xml(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gui_host::{NormalizedValue, ParameterId};
+    use mkapk_host::{NormalizedValue, ParameterId};
 
     #[test]
     fn generates_one_page_per_parameter_plus_bypass() {

@@ -15,8 +15,8 @@ pub use theme::Theme;
 
 #[cfg(test)]
 mod tests {
-    use gui_core::{AccessibilityNode, Role, Widget};
-    use gui_host::{NormalizedValue, ParameterId};
+    use mkapk_core::{AccessibilityNode, Role, Widget};
+    use mkapk_host::{NormalizedValue, ParameterId};
 
     use super::*;
 
@@ -26,28 +26,28 @@ mod tests {
     fn slider_can_be_constructed_and_implements_widget() {
         let slider = Slider::new(ParameterId(1), NormalizedValue::new(0.5), Theme::default());
         assert_widget(&slider);
-        assert_ne!(slider.id(), gui_core::WidgetId::default());
+        assert_ne!(slider.id(), mkapk_core::WidgetId::default());
     }
 
     #[test]
     fn knob_can_be_constructed_and_implements_widget() {
         let knob = Knob::new(ParameterId(2), NormalizedValue::new(0.25), Theme::default());
         assert_widget(&knob);
-        assert_ne!(knob.id(), gui_core::WidgetId::default());
+        assert_ne!(knob.id(), mkapk_core::WidgetId::default());
     }
 
     #[test]
     fn button_can_be_constructed_and_implements_widget() {
         let button = Button::new("Click", Theme::default());
         assert_widget(&button);
-        assert_ne!(button.id(), gui_core::WidgetId::default());
+        assert_ne!(button.id(), mkapk_core::WidgetId::default());
     }
 
     #[test]
     fn label_can_be_constructed_and_implements_widget() {
         let label = Label::new("Gain", Theme::default());
         assert_widget(&label);
-        assert_ne!(label.id(), gui_core::WidgetId::default());
+        assert_ne!(label.id(), mkapk_core::WidgetId::default());
     }
 
     #[test]
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn widget_trait_accessibility_can_be_called_explicitly() {
         let button = Button::new("Click", Theme::default());
-        let node: AccessibilityNode = gui_core::Widget::accessibility(&button);
+        let node: AccessibilityNode = mkapk_core::Widget::accessibility(&button);
         assert_eq!(node.role, Role::Button);
     }
 }

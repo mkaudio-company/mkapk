@@ -1,6 +1,6 @@
 #![allow(unexpected_cfgs)]
 
-use gui_core::ImageId;
+use mkapk_core::ImageId;
 
 #[cfg(target_os = "macos")]
 use std::collections::BTreeMap;
@@ -18,7 +18,7 @@ use core_graphics::image::{CGImage, CGImageAlphaInfo};
 
 /// Maps `ImageId`s to decoded images so the render backend can draw
 /// `PaintCommand::DrawImage` commands. Populate this from decoded
-/// `gui-res` resources: `PngImage::rgba_premultiplied()`, or
+/// `mkapk-res` resources: `PngImage::rgba_premultiplied()`, or
 /// `SvgImage::render_rgba()` (already premultiplied, since `tiny-skia`
 /// stores pixels premultiplied internally).
 #[cfg(target_os = "macos")]

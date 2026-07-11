@@ -17,8 +17,8 @@
 void AAX_CALLBACK AaxGeneric_AlgorithmProcessFunction(SAaxGeneric_Alg_Context* const inInstancesBegin[],
                                                         const void* inInstancesEnd)
 {
-    const int32_t numParams = gui_aax_parameter_count();
-    const bool acceptsMidi = gui_aax_accepts_midi() != 0;
+    const int32_t numParams = mkapk_aax_parameter_count();
+    const bool acceptsMidi = mkapk_aax_accepts_midi() != 0;
 
     for (SAaxGeneric_Alg_Context* const* walk = inInstancesBegin; walk < inInstancesEnd; ++walk)
     {
@@ -62,7 +62,7 @@ void AAX_CALLBACK AaxGeneric_AlgorithmProcessFunction(SAaxGeneric_Alg_Context* c
             // with some neutral parameter value" -- unlike a pure gain
             // processor (where gain=1.0 happens to be a passthrough), that
             // isn't true for an arbitrary future Processor, so this shim
-            // never routes bypass through gui_aax_process_block at all.
+            // never routes bypass through mkapk_aax_process_block at all.
             std::memcpy(pdO, pdI, static_cast<size_t>(buffersize) * sizeof(float));
         }
         else
@@ -72,7 +72,7 @@ void AAX_CALLBACK AaxGeneric_AlgorithmProcessFunction(SAaxGeneric_Alg_Context* c
             {
                 values[i] = *instance->mParamValueP[i];
             }
-            gui_aax_process_block(values, numParams, midiBytes, numMidiMessages, pdI, pdO,
+            mkapk_aax_process_block(values, numParams, midiBytes, numMidiMessages, pdI, pdO,
                                    buffersize);
         }
 

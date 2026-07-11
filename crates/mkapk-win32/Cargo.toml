@@ -1,5 +1,5 @@
 [package]
-name = "gui-win32"
+name = "mkapk-win32"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,8 +12,8 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
-gui-core = { workspace = true }
-gui-host = { workspace = true }
+mkapk-core = { workspace = true }
+mkapk-host = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62.2", default-features = false, features = [
@@ -36,4 +36,4 @@ windows = { version = "0.62.2", default-features = false, features = [
 windows-numerics = "0.3.1"
 
 [features]
-gpu-surface = ["gui-core/gpu-surface"]
+gpu-surface = ["mkapk-core/gpu-surface"]

@@ -1,6 +1,6 @@
 #![allow(unexpected_cfgs, deprecated)]
 
-use gui_core::{GpuContext, MetalContext, Sizef};
+use mkapk_core::{GpuContext, MetalContext, Sizef};
 
 #[cfg(target_os = "macos")]
 use objc::runtime::{Object, YES};

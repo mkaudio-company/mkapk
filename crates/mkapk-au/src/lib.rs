@@ -1,14 +1,14 @@
 //! Audio Unit plugin format wrapper.
 //!
 //! Always available (behind the `au` feature): an `AUCocoaUIBase`-ready
-//! Cocoa view around `gui-host::PluginEditor` (`editor`/`AuEditor`).
+//! Cocoa view around `mkapk-host::PluginEditor` (`editor`/`AuEditor`).
 //!
 //! macOS-only (no separate SDK download is needed -- AudioToolbox ships
 //! with the OS -- so unlike VST3/AAX there's no `_SDK_PATH` env var gate,
 //! just `target_os = "macos"`): a real, loadable AUv2 plugin entry point
 //! (`AudioComponentPlugInInterface`'s `Open`/`Close`/`Lookup` vtable,
-//! `Initialize`/`Render`/etc.) that bridges any `gui_host::Processor` +
-//! `gui_host::PluginEditor` pair into a host-discoverable Audio Unit, via
+//! `Initialize`/`Render`/etc.) that bridges any `mkapk_host::Processor` +
+//! `mkapk_host::PluginEditor` pair into a host-discoverable Audio Unit, via
 //! the [`au_entry!`] macro. On other platforms, or without the `au`
 //! feature, this crate is a no-op.
 #![allow(unexpected_cfgs)]
@@ -29,11 +29,11 @@ pub mod component;
 pub use au_sys;
 
 /// Generates a real AUv2 plugin entry point (an `AudioComponentFactoryFunction`
-/// named `factory_function`) wiring a concrete `gui_host::Processor` +
-/// `gui_host::PluginEditor` pair into this crate's reusable
+/// named `factory_function`) wiring a concrete `mkapk_host::Processor` +
+/// `mkapk_host::PluginEditor` pair into this crate's reusable
 /// `component::create_instance`.
 ///
-/// `parameters` should be `Vec<gui_host::ParameterInfo>` describing every
+/// `parameters` should be `Vec<mkapk_host::ParameterInfo>` describing every
 /// automatable parameter (typically `my_processor.parameters().to_vec()`).
 /// Whatever bundles this plugin (see `xtask`) must register
 /// `factory_function`'s name as the Audio Component's `factoryFunction` key
@@ -43,7 +43,7 @@ pub use au_sys;
 ///
 /// # Example
 /// ```ignore
-/// gui_au::au_entry! {
+/// mkapk_au::au_entry! {
 ///     processor: Box::new(processor::GainProcessor::new()),
 ///     editor: |gateway, meter| Box::new(ui::GainEditor::new(gateway, meter)),
 ///     parameters: processor::GainProcessor::new().parameters().to_vec(),

@@ -1,5 +1,5 @@
 [package]
-name = "gui-res"
+name = "mkapk-res"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,7 +12,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
-gui-core = { workspace = true }
+mkapk-core = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
 resvg = "0.47"
 usvg = "0.47"

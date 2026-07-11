@@ -1,5 +1,5 @@
 [package]
-name = "gui-aax"
+name = "mkapk-aax"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,8 +16,8 @@ default = []
 aax = []
 
 [dependencies]
-gui-core = { workspace = true }
-gui-host = { workspace = true }
+mkapk-core = { workspace = true }
+mkapk-host = { workspace = true }
 
 [dev-dependencies]
-gui-widgets = { workspace = true }
+mkapk-widgets = { workspace = true }

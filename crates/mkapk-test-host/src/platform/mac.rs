@@ -8,7 +8,7 @@ use cocoa::appkit::{
 };
 use cocoa::base::{NO, YES, id, nil};
 use cocoa::foundation::{NSDefaultRunLoopMode, NSPoint, NSRect, NSSize};
-use gui_host::ParentWindowHandle;
+use mkapk_host::ParentWindowHandle;
 use objc::runtime::Class;
 
 pub struct PlatformWindow {

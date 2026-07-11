@@ -3,14 +3,14 @@
 use std::cell::Cell;
 use std::ptr::null_mut;
 
-use gui_core::{
+use mkapk_core::{
     CommandList, LayoutConstraints, LayoutDirection, LayoutEngine, LayoutNode, LayoutResult,
     PaintCommand, Rectf, Sizef, TraverseOrder, Tree, Widget, WidgetId, downcast_widget_ref,
 };
-use gui_host::{
+use mkapk_host::{
     EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor, SizeConstraints,
 };
-use gui_widgets::{Button, Knob, Label, Slider, Theme};
+use mkapk_widgets::{Button, Knob, Label, Slider, Theme};
 
 #[cfg(target_os = "macos")]
 #[macro_use]
@@ -99,7 +99,7 @@ impl ControlsEditor {
             ..LayoutNode::default()
         });
 
-        let margin = gui_core::Insetsf::uniform(4.0);
+        let margin = mkapk_core::Insetsf::uniform(4.0);
         for &id in &[label_id, slider_id, knob_id, button_id] {
             layout_engine.set_node(LayoutNode {
                 id,
@@ -217,7 +217,7 @@ impl PluginEditor for ControlsEditor {
 
     fn idle(&mut self) {
         let commands = self.rebuild_commands();
-        gui_mac::render_to_view(self.view, self.size, self.scale, &commands);
+        mkapk_mac::render_to_view(self.view, self.size, self.scale, &commands);
     }
 
     fn on_parameter_changed(&mut self, _id: ParameterId, _value: NormalizedValue) {}
@@ -260,5 +260,5 @@ fn main() {
         }
     }
 
-    gui_test_host::run_test_host_with_editor(duration_ms, width, height, ControlsEditor::new());
+    mkapk_test_host::run_test_host_with_editor(duration_ms, width, height, ControlsEditor::new());
 }

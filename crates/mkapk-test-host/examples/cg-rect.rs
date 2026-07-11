@@ -1,9 +1,9 @@
 #![allow(unexpected_cfgs, deprecated)]
 
-use gui_core::{
+use mkapk_core::{
     BLUE, Color, ColorStop, CommandList, GREEN, PaintCommand, Pointf, RED, Rectf, Sizef,
 };
-use gui_host::{
+use mkapk_host::{
     EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor, SizeConstraints,
 };
 
@@ -70,7 +70,7 @@ impl PluginEditor for RectEditor {
 
     fn idle(&mut self) {
         let commands = build_commands(self.size);
-        gui_mac::render_to_view(self.view, self.size, self.scale, &commands);
+        mkapk_mac::render_to_view(self.view, self.size, self.scale, &commands);
     }
 
     fn on_parameter_changed(&mut self, _id: ParameterId, _value: NormalizedValue) {}
@@ -149,5 +149,5 @@ fn build_commands(size: Sizef) -> CommandList {
 }
 
 fn main() {
-    gui_test_host::run_test_host_with_editor(1000, 400, 300, RectEditor::new());
+    mkapk_test_host::run_test_host_with_editor(1000, 400, 300, RectEditor::new());
 }

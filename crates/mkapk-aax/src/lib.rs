@@ -9,8 +9,8 @@
 //! architecture.
 #![cfg_attr(not(aax_sdk), deny(unsafe_code))]
 
-use gui_core::Sizef;
-use gui_host::{EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor};
+use mkapk_core::Sizef;
+use mkapk_host::{EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor};
 
 #[cfg(all(feature = "aax", aax_sdk))]
 pub mod component;
@@ -31,23 +31,23 @@ pub const fn fourcc(bytes: [u8; 4]) -> u32 {
 /// shim (`cpp/AaxPlugin_Describe.cpp`, `cpp/AaxPlugin_Parameters.cpp`,
 /// `cpp/AaxPlugin_AlgProc.cpp`) calls into: plugin-identity getters, the
 /// parameter-metadata getters those files loop over at Describe/EffectInit
-/// time, and the real-time `gui_aax_process_block` bridge. None of the C++
+/// time, and the real-time `mkapk_aax_process_block` bridge. None of the C++
 /// on the other side of this boundary is specific to `$make_processor`'s
 /// concrete type -- see `component`'s doc comment for why this works for
-/// any `gui_host::Processor` with at most [`component::MAX_PARAMS`]
+/// any `mkapk_host::Processor` with at most [`component::MAX_PARAMS`]
 /// parameters, not just this one plugin.
 ///
-/// `make_processor` should build a fresh `gui_host::Processor` (e.g.
+/// `make_processor` should build a fresh `mkapk_host::Processor` (e.g.
 /// `processor::GainProcessor::new`). The FourCC fields are most easily
-/// built with [`fourcc`], e.g. `gui_aax::fourcc(*b"Mkau")`.
+/// built with [`fourcc`], e.g. `mkapk_aax::fourcc(*b"Mkau")`.
 ///
 /// # Example
 /// ```ignore
-/// gui_aax::aax_entry! {
+/// mkapk_aax::aax_entry! {
 ///     processor: processor::GainProcessor::new,
-///     manufacturer_id: gui_aax::fourcc(*b"Mkau"),
-///     product_id: gui_aax::fourcc(*b"Gain"),
-///     plugin_id_native: gui_aax::fourcc(*b"GnNa"),
+///     manufacturer_id: mkapk_aax::fourcc(*b"Mkau"),
+///     product_id: mkapk_aax::fourcc(*b"Gain"),
+///     plugin_id_native: mkapk_aax::fourcc(*b"GnNa"),
 ///     effect_id: "com.mkaudio.aax.gain",
 ///     name: "Gain",
 ///     manufacturer_name: "mkaudio",
@@ -66,43 +66,43 @@ macro_rules! aax_entry {
         manufacturer_name: $manufacturer_name:expr $(,)?
     ) => {
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_effect_id() -> *const u8 {
+        pub extern "C" fn mkapk_aax_effect_id() -> *const u8 {
             concat!($effect_id, "\0").as_ptr()
         }
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_plugin_name() -> *const u8 {
+        pub extern "C" fn mkapk_aax_plugin_name() -> *const u8 {
             concat!($name, "\0").as_ptr()
         }
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_manufacturer_name() -> *const u8 {
+        pub extern "C" fn mkapk_aax_manufacturer_name() -> *const u8 {
             concat!($manufacturer_name, "\0").as_ptr()
         }
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_manufacturer_id() -> u32 {
+        pub extern "C" fn mkapk_aax_manufacturer_id() -> u32 {
             $manufacturer_id
         }
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_product_id() -> u32 {
+        pub extern "C" fn mkapk_aax_product_id() -> u32 {
             $product_id
         }
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_plugin_id_native() -> u32 {
+        pub extern "C" fn mkapk_aax_plugin_id_native() -> u32 {
             $plugin_id_native
         }
 
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_parameter_count() -> i32 {
+        pub extern "C" fn mkapk_aax_parameter_count() -> i32 {
             $crate::component::parameter_count(&mut || $make_processor())
         }
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_parameter_id(index: i32) -> u32 {
+        pub extern "C" fn mkapk_aax_parameter_id(index: i32) -> u32 {
             $crate::component::parameter_id(&mut || $make_processor(), index)
         }
         /// # Safety
         /// `out` must be valid for `out_capacity` writable bytes -- upheld
         /// by this crate's C++ shim, the only caller.
         #[unsafe(no_mangle)]
-        pub unsafe extern "C" fn gui_aax_parameter_name(
+        pub unsafe extern "C" fn mkapk_aax_parameter_name(
             index: i32,
             out: *mut u8,
             out_capacity: i32,
@@ -119,16 +119,16 @@ macro_rules! aax_entry {
             }
         }
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_parameter_default(index: i32) -> f32 {
+        pub extern "C" fn mkapk_aax_parameter_default(index: i32) -> f32 {
             $crate::component::parameter_default(&mut || $make_processor(), index)
         }
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_parameter_step_count(index: i32) -> i32 {
+        pub extern "C" fn mkapk_aax_parameter_step_count(index: i32) -> i32 {
             $crate::component::parameter_step_count(&mut || $make_processor(), index)
         }
 
         #[unsafe(no_mangle)]
-        pub extern "C" fn gui_aax_accepts_midi() -> i32 {
+        pub extern "C" fn mkapk_aax_accepts_midi() -> i32 {
             $crate::component::accepts_midi(&mut || $make_processor()) as i32
         }
 
@@ -139,7 +139,7 @@ macro_rules! aax_entry {
         /// samples -- upheld by this crate's C++ shim, the only caller, per
         /// AAX's own `SAaxGeneric_Alg_Context` contract.
         #[unsafe(no_mangle)]
-        pub unsafe extern "C" fn gui_aax_process_block(
+        pub unsafe extern "C" fn mkapk_aax_process_block(
             values: *const f32,
             num_values: i32,
             midi_bytes: *const u8,
@@ -227,7 +227,7 @@ impl AaxEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gui_host::{EditorHost, NormalizedValue, ParameterId, PluginEditor, SizeConstraints};
+    use mkapk_host::{EditorHost, NormalizedValue, ParameterId, PluginEditor, SizeConstraints};
 
     struct MockEditor;
 

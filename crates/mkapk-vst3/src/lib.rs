@@ -1,12 +1,12 @@
 //! VST3 plugin format wrapper.
 //!
 //! Always available (behind the `vst3` feature): an `IPlugView`
-//! implementation around `gui-host::PluginEditor` (`view`/`PluginView`).
+//! implementation around `mkapk-host::PluginEditor` (`view`/`PluginView`).
 //!
 //! Gated behind `VST3_SDK_PATH` being set at build time (see `build.rs`,
 //! which sets `cfg(vst3_sdk)`): a real, loadable VST3 plugin entry point
 //! (`IPluginFactory`/`IComponent`/`IAudioProcessor`/`IEditController`) that
-//! bridges any `gui_host::Processor` + `gui_host::PluginEditor` pair into a
+//! bridges any `mkapk_host::Processor` + `mkapk_host::PluginEditor` pair into a
 //! host-discoverable plugin, via the `vst3_entry!` macro. Without
 //! `VST3_SDK_PATH` set, this crate is a view-only stub (no factory, so
 //! nothing a VST3 host could actually load).
@@ -31,10 +31,10 @@ pub use vst3_sys;
 
 /// Generates a real VST3 plugin entry point (`GetPluginFactory` and the
 /// module-load exports every VST3 host module convention expects) wiring a
-/// concrete `gui_host::Processor` + `gui_host::PluginEditor` pair into
+/// concrete `mkapk_host::Processor` + `mkapk_host::PluginEditor` pair into
 /// this crate's reusable `VstAudioProcessor`/`VstEditController`/`VstFactory`.
 ///
-/// `parameters` should be `Vec<gui_host::ParameterInfo>` describing every
+/// `parameters` should be `Vec<mkapk_host::ParameterInfo>` describing every
 /// automatable parameter (typically `my_processor.parameters().to_vec()`);
 /// `processor_cid`/`controller_cid` should be built via [`guid`] from two
 /// distinct, randomly generated 16-byte values (never reuse another
@@ -45,12 +45,12 @@ pub use vst3_sys;
 ///
 /// # Example
 /// ```ignore
-/// gui_vst3::vst3_entry! {
+/// mkapk_vst3::vst3_entry! {
 ///     processor: Box::new(processor::GainProcessor::new()),
 ///     editor: |gateway| Box::new(ui::GainEditor::new(gateway)),
 ///     parameters: processor::GainProcessor::new().parameters().to_vec(),
-///     processor_cid: gui_vst3::guid([0x84, 0xE8, /* ... */]),
-///     controller_cid: gui_vst3::guid([0xD3, 0x9D, /* ... */]),
+///     processor_cid: mkapk_vst3::guid([0x84, 0xE8, /* ... */]),
+///     controller_cid: mkapk_vst3::guid([0xD3, 0x9D, /* ... */]),
 ///     midi_cc_map: &[(7, processor::GAIN_PARAM)],
 ///     name: "Gain",
 ///     vendor: "mkaudio",
@@ -75,11 +75,11 @@ macro_rules! vst3_entry {
         email: $email:expr,
         version: $version:expr $(,)?
     ) => {
-        fn __gui_vst3_create_processor() -> *mut ::std::os::raw::c_void {
+        fn __mkapk_vst3_create_processor() -> *mut ::std::os::raw::c_void {
             $crate::processor::VstAudioProcessor::create_instance($controller_cid, $make_processor)
         }
 
-        fn __gui_vst3_create_controller() -> *mut ::std::os::raw::c_void {
+        fn __mkapk_vst3_create_controller() -> *mut ::std::os::raw::c_void {
             $crate::controller::VstEditController::create_instance(
                 $parameters,
                 $make_editor,
@@ -141,8 +141,8 @@ macro_rules! vst3_entry {
                     email: $email,
                     version: $version,
                 },
-                __gui_vst3_create_processor,
-                __gui_vst3_create_controller,
+                __mkapk_vst3_create_processor,
+                __mkapk_vst3_create_controller,
             )
         }
     };

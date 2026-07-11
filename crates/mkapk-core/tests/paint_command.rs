@@ -1,4 +1,4 @@
-use gui_core::{BLACK, Color, CommandList, PaintCommand, Pointf, Rectf, Sizef, WHITE};
+use mkapk_core::{BLACK, Color, CommandList, PaintCommand, Pointf, Rectf, Sizef, WHITE};
 
 const COUNT: usize = 10_000;
 

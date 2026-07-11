@@ -1,7 +1,7 @@
 //! The plugin's audio processor. This is the ONE place DSP logic lives —
 //! every build target (Standalone/VST3/AU/AAX) shares this same
-//! implementation via the `gui_host::Processor` trait.
-use gui_host::{
+//! implementation via the `mkapk_host::Processor` trait.
+use mkapk_host::{
     ChannelLayout, MidiMessage, NormalizedValue, ParameterId, ParameterInfo, Processor,
 };
 

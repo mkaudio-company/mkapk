@@ -1,9 +1,9 @@
 #![allow(unexpected_cfgs)]
 
-use gui_core::{Pointf, Sizef, TextLayoutId};
+use mkapk_core::{Pointf, Sizef, TextLayoutId};
 
 #[cfg(target_os = "windows")]
-use gui_core::RenderBackend;
+use mkapk_core::RenderBackend;
 
 #[cfg(target_os = "windows")]
 use windows::{
@@ -168,7 +168,7 @@ impl TextLayout {
     }
 
     pub fn draw(&self, backend: &mut D2DRenderBackend<'_>, position: Pointf) {
-        backend.draw_text_layout(&self.layout, position, gui_core::WHITE);
+        backend.draw_text_layout(&self.layout, position, mkapk_core::WHITE);
     }
 }
 

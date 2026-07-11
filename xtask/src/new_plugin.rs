@@ -410,27 +410,27 @@ fn render_cargo_toml(identity: &Identity, formats: &[String]) -> String {
 
     let mut feature_lines = vec!["default = []".to_string()];
     let mut deps = vec![
-        "gui-core = { workspace = true }".to_string(),
-        "gui-host = { workspace = true }".to_string(),
-        "gui-res = { workspace = true }".to_string(),
-        "gui-widgets = { workspace = true }".to_string(),
+        "mkapk-core = { workspace = true }".to_string(),
+        "mkapk-host = { workspace = true }".to_string(),
+        "mkapk-res = { workspace = true }".to_string(),
+        "mkapk-widgets = { workspace = true }".to_string(),
     ];
     if has("standalone") {
-        feature_lines.push("standalone = [\"dep:gui-standalone\"]".to_string());
-        deps.push("gui-standalone = { workspace = true, optional = true }".to_string());
+        feature_lines.push("standalone = [\"dep:mkapk-standalone\"]".to_string());
+        deps.push("mkapk-standalone = { workspace = true, optional = true }".to_string());
     }
     if has("vst3") {
-        feature_lines.push("vst3 = [\"dep:gui-vst3\"]".to_string());
-        deps.push("gui-vst3 = { workspace = true, optional = true }".to_string());
+        feature_lines.push("vst3 = [\"dep:mkapk-vst3\"]".to_string());
+        deps.push("mkapk-vst3 = { workspace = true, optional = true }".to_string());
     }
     if has("au") {
-        feature_lines.push("au = [\"dep:gui-au\"]".to_string());
-        deps.push("gui-au = { workspace = true, optional = true }".to_string());
+        feature_lines.push("au = [\"dep:mkapk-au\"]".to_string());
+        deps.push("mkapk-au = { workspace = true, optional = true }".to_string());
     }
     if has("aax") {
-        feature_lines.push("aax = [\"dep:gui-aax\"]".to_string());
+        feature_lines.push("aax = [\"dep:mkapk-aax\"]".to_string());
         deps.push(
-            "gui-aax = { workspace = true, optional = true, features = [\"aax\"] }".to_string(),
+            "mkapk-aax = { workspace = true, optional = true, features = [\"aax\"] }".to_string(),
         );
     }
 
@@ -455,10 +455,10 @@ fn render_cargo_toml(identity: &Identity, formats: &[String]) -> String {
          {deps}\n\
          \n\
          [target.'cfg(target_os = \"macos\")'.dependencies]\n\
-         gui-mac = {{ workspace = true }}\n\
+         mkapk-mac = {{ workspace = true }}\n\
          \n\
          [target.'cfg(target_os = \"windows\")'.dependencies]\n\
-         gui-win32 = {{ workspace = true }}\n",
+         mkapk-win32 = {{ workspace = true }}\n",
         lib_name = identity.lib_name,
         features = feature_lines.join("\n"),
         deps = deps.join("\n"),
@@ -474,7 +474,7 @@ fn render_lib_rs(identity: &Identity, formats: &[String]) -> String {
          //! bundled into Standalone/VST3/AUv2/AAX for macOS and Windows. See\n\
          //! `src/processor.rs` for the DSP and `src/ui.rs` for the editor; each\n\
          //! format's entry point (added behind its own feature) wires the two\n\
-         //! together via `gui_host::LockFreeParameterGateway` without either file\n\
+         //! together via `mkapk_host::LockFreeParameterGateway` without either file\n\
          //! knowing about the other.\n\
          //!\n\
          //! Scaffolded by `cargo xtask new-plugin` from `plugins/gain`.\n\
@@ -490,15 +490,15 @@ fn render_lib_rs(identity: &Identity, formats: &[String]) -> String {
         out.push_str(&format!(
             "\n\
              #[cfg(all(feature = \"vst3\", vst3_sdk))]\n\
-             gui_vst3::vst3_entry! {{\n\
+             mkapk_vst3::vst3_entry! {{\n\
              \x20\x20\x20\x20processor: Box::new(processor::{pascal}Processor::new()),\n\
-             \x20\x20\x20\x20editor: |gateway| Box::new(ui::{pascal}Editor::new(gateway, gui_host::PeakMeter::new())),\n\
+             \x20\x20\x20\x20editor: |gateway| Box::new(ui::{pascal}Editor::new(gateway, mkapk_host::PeakMeter::new())),\n\
              \x20\x20\x20\x20parameters: {{\n\
-             \x20\x20\x20\x20\x20\x20\x20\x20use gui_host::Processor as _;\n\
+             \x20\x20\x20\x20\x20\x20\x20\x20use mkapk_host::Processor as _;\n\
              \x20\x20\x20\x20\x20\x20\x20\x20processor::{pascal}Processor::new().parameters().to_vec()\n\
              \x20\x20\x20\x20}},\n\
-             \x20\x20\x20\x20processor_cid: gui_vst3::guid([{processor_cid}]),\n\
-             \x20\x20\x20\x20controller_cid: gui_vst3::guid([{controller_cid}]),\n\
+             \x20\x20\x20\x20processor_cid: mkapk_vst3::guid([{processor_cid}]),\n\
+             \x20\x20\x20\x20controller_cid: mkapk_vst3::guid([{controller_cid}]),\n\
              \x20\x20\x20\x20// No MIDI-CC automation by default -- e.g. &[(7,\n\
              \x20\x20\x20\x20// processor::SOME_PARAM)] maps CC 7 to a parameter.\n\
              \x20\x20\x20\x20midi_cc_map: &[],\n\
@@ -520,11 +520,11 @@ fn render_lib_rs(identity: &Identity, formats: &[String]) -> String {
         out.push_str(&format!(
             "\n\
              #[cfg(all(feature = \"au\", target_os = \"macos\"))]\n\
-             gui_au::au_entry! {{\n\
+             mkapk_au::au_entry! {{\n\
              \x20\x20\x20\x20processor: Box::new(processor::{pascal}Processor::new()),\n\
              \x20\x20\x20\x20editor: |gateway, meter| Box::new(ui::{pascal}Editor::new(gateway, meter)),\n\
              \x20\x20\x20\x20parameters: {{\n\
-             \x20\x20\x20\x20\x20\x20\x20\x20use gui_host::Processor as _;\n\
+             \x20\x20\x20\x20\x20\x20\x20\x20use mkapk_host::Processor as _;\n\
              \x20\x20\x20\x20\x20\x20\x20\x20processor::{pascal}Processor::new().parameters().to_vec()\n\
              \x20\x20\x20\x20}},\n\
              \x20\x20\x20\x20factory_function: {au_factory_symbol},\n\
@@ -537,11 +537,11 @@ fn render_lib_rs(identity: &Identity, formats: &[String]) -> String {
         out.push_str(&format!(
             "\n\
              #[cfg(all(feature = \"aax\", aax_sdk))]\n\
-             gui_aax::aax_entry! {{\n\
+             mkapk_aax::aax_entry! {{\n\
              \x20\x20\x20\x20processor: processor::{pascal}Processor::new,\n\
-             \x20\x20\x20\x20manufacturer_id: gui_aax::fourcc(*b\"{manufacturer_fourcc}\"),\n\
-             \x20\x20\x20\x20product_id: gui_aax::fourcc(*b\"{product_fourcc}\"),\n\
-             \x20\x20\x20\x20plugin_id_native: gui_aax::fourcc(*b\"{native_fourcc}\"),\n\
+             \x20\x20\x20\x20manufacturer_id: mkapk_aax::fourcc(*b\"{manufacturer_fourcc}\"),\n\
+             \x20\x20\x20\x20product_id: mkapk_aax::fourcc(*b\"{product_fourcc}\"),\n\
+             \x20\x20\x20\x20plugin_id_native: mkapk_aax::fourcc(*b\"{native_fourcc}\"),\n\
              \x20\x20\x20\x20effect_id: \"com.{company_slug}.aax.{slug_slug}\",\n\
              \x20\x20\x20\x20name: \"{display_name}\",\n\
              \x20\x20\x20\x20manufacturer_name: \"{company}\",\n\

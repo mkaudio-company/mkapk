@@ -1,6 +1,6 @@
 #![allow(unexpected_cfgs)]
 
-use gui_core::{D3D11Context, GpuContext, Sizef};
+use mkapk_core::{D3D11Context, GpuContext, Sizef};
 
 #[cfg(target_os = "windows")]
 use windows::{

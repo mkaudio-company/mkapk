@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use gui_core::ImageId;
+use mkapk_core::ImageId;
 
 /// Maps `ImageId`s to decoded premultiplied-alpha RGBA8 bytes so the render
 /// backend can draw `PaintCommand::DrawImage` commands. Populate this from
-/// decoded `gui-res` resources: `PngImage::rgba_premultiplied()`, or
+/// decoded `mkapk-res` resources: `PngImage::rgba_premultiplied()`, or
 /// `SvgImage::render_rgba()` (already premultiplied, since `tiny-skia`
 /// stores pixels premultiplied internally).
 ///

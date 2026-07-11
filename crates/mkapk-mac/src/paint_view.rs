@@ -15,16 +15,16 @@
 #![allow(unexpected_cfgs)]
 
 #[cfg(not(target_os = "macos"))]
-use gui_core::{CommandList, Sizef};
+use mkapk_core::{CommandList, Sizef};
 
 /// A boxed callback that turns a real OS mouse event (already converted
 /// into the framework's top-left-origin coordinate space) into a widget
 /// tree dispatch, returning whether some widget handled it. Owned by the
 /// `GuiPaintView` (via `PaintState`) so `mouseDown:`/`mouseDragged:`/
 /// `mouseUp:` can forward events synchronously as AppKit delivers them,
-/// mirroring how `gui-test-host`'s Win32 window forwards `WM_LBUTTONDOWN`
+/// mirroring how `mkapk-test-host`'s Win32 window forwards `WM_LBUTTONDOWN`
 /// etc.
-pub type InputSink = Box<dyn FnMut(gui_core::Event) -> gui_core::EventResponse>;
+pub type InputSink = Box<dyn FnMut(mkapk_core::Event) -> mkapk_core::EventResponse>;
 
 #[cfg(target_os = "macos")]
 mod macos {
@@ -35,7 +35,7 @@ mod macos {
 
     use cocoa::base::{YES, id, nil};
     use cocoa::foundation::{NSPoint, NSRect, NSSize};
-    use gui_core::{
+    use mkapk_core::{
         CommandList, Event, Modifiers, MouseButton, MouseEvent, PaintCommand, PointerEvent, Pointf,
         Rectf, RenderBackend, Sizef,
     };

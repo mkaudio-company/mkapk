@@ -6,10 +6,10 @@
 #[macro_use]
 extern crate objc;
 
-use gui_core::Sizef;
+use mkapk_core::Sizef;
 #[cfg(target_os = "windows")]
-use gui_core::{Event, EventResponse};
-use gui_host::{
+use mkapk_core::{Event, EventResponse};
+use mkapk_host::{
     EditorHost, NormalizedValue, ParameterId, ParentWindowHandle, PluginEditor, SizeConstraints,
 };
 
@@ -20,7 +20,7 @@ pub use platform::{PlatformWindow, create_host_window};
 /// meaningful on Windows: `PlatformWindow::set_input_sink` hooks the one
 /// `wndproc` this crate owns, since a real Win32 host or DAW's window isn't
 /// ours to subclass. On macOS, the editor's own view (see
-/// `gui_mac::paint_view`) wires mouse handling directly during `open()`
+/// `mkapk_mac::paint_view`) wires mouse handling directly during `open()`
 /// instead, so this is a no-op there.
 ///
 /// # Safety invariant

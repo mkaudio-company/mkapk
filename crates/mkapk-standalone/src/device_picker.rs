@@ -4,7 +4,7 @@
 //!
 //! This runs mkgraphic's own `App`/`Window` for the picker, in the same
 //! process and on the same shared `NSApplication` as the plugin's own
-//! window (created afterward via `gui-test-host`). `mkgraphic::host::App`
+//! window (created afterward via `mkapk-test-host`). `mkgraphic::host::App`
 //! has no supported way to stop its run loop from inside a button/dropdown
 //! callback, so `stop_current_app` reaches the same shared `NSApplication`
 //! singleton directly via `objc2-app-kit` instead (the same call

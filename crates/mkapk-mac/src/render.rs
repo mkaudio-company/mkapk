@@ -1,9 +1,9 @@
 #![allow(unexpected_cfgs)]
 
-use gui_core::{CommandList, Pointf, Rectf, RenderBackend, Sizef};
+use mkapk_core::{CommandList, Pointf, Rectf, RenderBackend, Sizef};
 
 #[cfg(target_os = "macos")]
-use gui_core::{Color, PaintCommand};
+use mkapk_core::{Color, PaintCommand};
 
 #[cfg(target_os = "macos")]
 use core_graphics::base::CGFloat;
@@ -274,7 +274,7 @@ fn draw_linear_gradient(
     rect: Rectf,
     start: Pointf,
     end: Pointf,
-    stops: &[gui_core::ColorStop],
+    stops: &[mkapk_core::ColorStop],
 ) {
     let mut components = Vec::with_capacity(stops.len() * 4);
     let mut locations = Vec::with_capacity(stops.len());
@@ -494,19 +494,19 @@ mod tests {
         let red_pixels: [u8; 16] = [
             255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255,
         ];
-        images.register_rgba(gui_core::ImageId(1), 2, 2, &red_pixels);
+        images.register_rgba(mkapk_core::ImageId(1), 2, 2, &red_pixels);
 
         let mut commands = CommandList::new();
         commands.push(PaintCommand::Clear {
             color: Color::new(30, 30, 30, 255),
         });
         commands.push(PaintCommand::FillRect {
-            rect: Rectf::new(Pointf::new(0.0, 0.0), gui_core::Sizef::new(4.0, 4.0)),
+            rect: Rectf::new(Pointf::new(0.0, 0.0), mkapk_core::Sizef::new(4.0, 4.0)),
             color: Color::new(50, 50, 50, 255),
         });
         commands.push(PaintCommand::DrawImage {
-            rect: Rectf::new(Pointf::new(4.0, 4.0), gui_core::Sizef::new(4.0, 4.0)),
-            image: gui_core::ImageId(1),
+            rect: Rectf::new(Pointf::new(4.0, 4.0), mkapk_core::Sizef::new(4.0, 4.0)),
+            image: mkapk_core::ImageId(1),
         });
 
         let mut backend = CoreGraphicsRenderBackend::with_registries(

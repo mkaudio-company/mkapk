@@ -1,17 +1,17 @@
 [workspace]
 members = [
-    "crates/gui-core",
-    "crates/gui-host",
-    "crates/gui-res",
-    "crates/gui-accessibility",
-    "crates/gui-win32",
-    "crates/gui-mac",
-    "crates/gui-vst3",
-    "crates/gui-au",
-    "crates/gui-aax",
-    "crates/gui-test-host",
-    "crates/gui-widgets",
-    "crates/gui-standalone",
+    "crates/mkapk-core",
+    "crates/mkapk-host",
+    "crates/mkapk-res",
+    "crates/mkapk-accessibility",
+    "crates/mkapk-win32",
+    "crates/mkapk-mac",
+    "crates/mkapk-vst3",
+    "crates/mkapk-au",
+    "crates/mkapk-aax",
+    "crates/mkapk-test-host",
+    "crates/mkapk-widgets",
+    "crates/mkapk-standalone",
     "plugins/gain",
     "xtask",
 ]
@@ -30,15 +30,15 @@ categories = ["multimedia::audio", "gui", "development-tools::ffi", "os::macos-a
 keywords = ["audio-plugin", "vst3", "au", "aax", "midi"]
 
 [workspace.dependencies]
-gui-core = { path = "crates/gui-core", version = "0.1.0" }
-gui-host = { path = "crates/gui-host", version = "0.1.0" }
-gui-res = { path = "crates/gui-res", version = "0.1.0" }
-gui-accessibility = { path = "crates/gui-accessibility", version = "0.1.0" }
-gui-mac = { path = "crates/gui-mac", version = "0.1.0" }
-gui-test-host = { path = "crates/gui-test-host", version = "0.1.0" }
-gui-widgets = { path = "crates/gui-widgets", version = "0.1.0" }
-gui-win32 = { path = "crates/gui-win32", version = "0.1.0" }
-gui-standalone = { path = "crates/gui-standalone", version = "0.1.0" }
-gui-vst3 = { path = "crates/gui-vst3", version = "0.1.0" }
-gui-au = { path = "crates/gui-au", version = "0.1.0" }
-gui-aax = { path = "crates/gui-aax", version = "0.1.0" }
+mkapk-core = { path = "crates/mkapk-core", version = "0.1.0" }
+mkapk-host = { path = "crates/mkapk-host", version = "0.1.0" }
+mkapk-res = { path = "crates/mkapk-res", version = "0.1.0" }
+mkapk-accessibility = { path = "crates/mkapk-accessibility", version = "0.1.0" }
+mkapk-mac = { path = "crates/mkapk-mac", version = "0.1.0" }
+mkapk-test-host = { path = "crates/mkapk-test-host", version = "0.1.0" }
+mkapk-widgets = { path = "crates/mkapk-widgets", version = "0.1.0" }
+mkapk-win32 = { path = "crates/mkapk-win32", version = "0.1.0" }
+mkapk-standalone = { path = "crates/mkapk-standalone", version = "0.1.0" }
+mkapk-vst3 = { path = "crates/mkapk-vst3", version = "0.1.0" }
+mkapk-au = { path = "crates/mkapk-au", version = "0.1.0" }
+mkapk-aax = { path = "crates/mkapk-aax", version = "0.1.0" }

@@ -10,7 +10,7 @@ extern crate std;
 
 use alloc::boxed::Box;
 
-use gui_core::AccessibilityTree;
+use mkapk_core::AccessibilityTree;
 
 pub trait AccessibilityBackend {
     fn update_tree(&mut self, tree: &AccessibilityTree);
@@ -77,7 +77,7 @@ pub fn default_backend() -> Box<dyn AccessibilityBackend> {
 mod tests {
     use alloc::boxed::Box;
 
-    use gui_core::{AccessibilityNode, AccessibilityTree, Role, WidgetId};
+    use mkapk_core::{AccessibilityNode, AccessibilityTree, Role, WidgetId};
 
     use super::{AccessibilityBackend, NoopBackend};
 
