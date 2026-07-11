@@ -6,6 +6,7 @@ mod aax;
 mod bundle;
 mod new_plugin;
 mod plugin_target;
+mod publish;
 mod setup;
 mod vst3;
 
@@ -26,6 +27,7 @@ fn main() -> ExitCode {
         "bundle-all" => run_bundle_all(),
         "validate" => run_validate(),
         "new-plugin" => new_plugin::new_plugin(&args[2..]),
+        "publish" => publish::publish(&args[2..]),
         other => {
             eprintln!("Unknown command: {}", other);
             ExitCode::from(1)
