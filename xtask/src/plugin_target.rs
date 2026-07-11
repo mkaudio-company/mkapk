@@ -21,6 +21,12 @@ pub struct PluginTarget {
     /// The symbol name passed to `au_entry! { factory_function: .. }`, e.g.
     /// `"gain_au_factory"`.
     pub au_factory_symbol: String,
+    /// `[[bin]] name` for the AU component-type helper, e.g.
+    /// `"gain-au-info"` -- prints `aufx`/`aumf`/`aumu` depending on the
+    /// concrete processor's `accepts_midi`/`plugin_kind`, which `bundle.rs`
+    /// can't otherwise know without running the plugin's own code (see
+    /// `plugins/gain/src/bin/au_info.rs`).
+    pub au_info_bin: String,
 }
 
 impl PluginTarget {
@@ -32,6 +38,7 @@ impl PluginTarget {
             standalone_bin: format!("{slug}-standalone"),
             aax_page_table_bin: format!("{slug}-aax-page-table"),
             au_factory_symbol: format!("{underscored}_au_factory"),
+            au_info_bin: format!("{slug}-au-info"),
             slug: slug.to_string(),
         }
     }
@@ -81,6 +88,7 @@ mod tests {
         assert_eq!(target.standalone_bin, "multi-band-standalone");
         assert_eq!(target.aax_page_table_bin, "multi-band-aax-page-table");
         assert_eq!(target.au_factory_symbol, "multi_band_au_factory");
+        assert_eq!(target.au_info_bin, "multi-band-au-info");
     }
 
     #[test]

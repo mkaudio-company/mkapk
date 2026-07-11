@@ -3,11 +3,11 @@
 //! side. Not generic over the concrete `Processor` type (COM vtable
 //! generation via `#[VST3(implements(...))]` needs a concrete struct); any
 //! plugin project supplies its processor as a `Box<dyn Processor>`.
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::mem;
 use std::os::raw::c_void;
 
-use gui_host::{NormalizedValue, ParameterId, Processor};
+use gui_host::{MidiMessage, NormalizedValue, ParameterId, Processor};
 use vst3_com::sys::GUID;
 use vst3_com::{IID, VstPtr};
 use vst3_sys::VST3;
@@ -17,9 +17,9 @@ use vst3_sys::base::{
 };
 use vst3_sys::utils::SharedVstPtr;
 use vst3_sys::vst::{
-    BusDirection, BusInfo, IAudioProcessor, IComponent, IParamValueQueue, IParameterChanges,
-    IProcessContextRequirements, IoMode, K_SAMPLE32, MediaType, ProcessData, ProcessSetup,
-    RoutingInfo, SpeakerArrangement,
+    BusDirection, BusInfo, Event, EventTypes, IAudioProcessor, IComponent, IEventList,
+    IParamValueQueue, IParameterChanges, IProcessContextRequirements, IoMode, K_SAMPLE32,
+    MediaType, ProcessData, ProcessSetup, RoutingInfo, SpeakerArrangement,
 };
 
 use crate::util::wstrcpy;
@@ -62,6 +62,12 @@ pub struct VstAudioProcessor {
     process_setup: RefCell<ProcessSetup>,
     audio_inputs: RefCell<Vec<AudioBus>>,
     audio_outputs: RefCell<Vec<AudioBus>>,
+    /// Set from `Processor::accepts_midi` during `initialize`: whether this
+    /// instance declares a MIDI (`kEvent`) input bus at all. Real hosts
+    /// only ever send `IEventList` events on a bus the plugin itself
+    /// declared via `get_bus_count`/`get_bus_info`, so a processor that
+    /// doesn't want MIDI (the default) never pays for event-list COM calls.
+    has_midi_input: Cell<bool>,
     context: RefCell<Option<VstPtr<dyn IUnknown>>>,
 }
 
@@ -78,6 +84,7 @@ impl VstAudioProcessor {
             }),
             RefCell::new(Vec::new()),
             RefCell::new(Vec::new()),
+            Cell::new(false),
             RefCell::new(None),
         )
     }
@@ -94,7 +101,8 @@ impl IPluginBase for VstAudioProcessor {
         }
         *self.context.borrow_mut() = unsafe { VstPtr::shared(context as *mut _) };
 
-        let layout = self.processor.borrow().channel_layout();
+        let processor = self.processor.borrow();
+        let layout = processor.channel_layout();
         if layout.input_channels > 0 {
             self.audio_inputs.borrow_mut().push(AudioBus {
                 name: "Input".to_string(),
@@ -109,6 +117,7 @@ impl IPluginBase for VstAudioProcessor {
                 active: true as TBool,
             });
         }
+        self.has_midi_input.set(processor.accepts_midi());
 
         kResultOk
     }
@@ -134,13 +143,19 @@ impl IComponent for VstAudioProcessor {
     }
 
     unsafe fn get_bus_count(&self, type_: MediaType, dir: BusDirection) -> i32 {
-        if type_ != 0 {
-            return 0;
-        }
-        if dir == 0 {
-            self.audio_inputs.borrow().len() as i32
-        } else {
-            self.audio_outputs.borrow().len() as i32
+        match type_ {
+            0 => {
+                if dir == 0 {
+                    self.audio_inputs.borrow().len() as i32
+                } else {
+                    self.audio_outputs.borrow().len() as i32
+                }
+            }
+            // kEvent: exactly one MIDI input bus, only when the processor
+            // actually wants MIDI (see `initialize`) -- real hosts only
+            // ever deliver `IEventList` events on a bus we declare here.
+            1 if dir == 0 && self.has_midi_input.get() => 1,
+            _ => 0,
         }
     }
 
@@ -151,6 +166,21 @@ impl IComponent for VstAudioProcessor {
         index: i32,
         info: *mut BusInfo,
     ) -> tresult {
+        if type_ == 1 {
+            if dir != 0 || index != 0 || !self.has_midi_input.get() {
+                return kInvalidArgument;
+            }
+            unsafe {
+                let info = &mut *info;
+                info.media_type = type_;
+                info.direction = dir;
+                info.channel_count = 16; // conventional: supports all 16 MIDI channels
+                wstrcpy("MIDI In", info.name.as_mut_ptr());
+                info.bus_type = 0; // kMain
+                info.flags = 1; // kDefaultActive
+            }
+            return kResultTrue;
+        }
         if type_ != 0 {
             return kResultFalse;
         }
@@ -190,6 +220,13 @@ impl IComponent for VstAudioProcessor {
         index: i32,
         state: TBool,
     ) -> tresult {
+        if type_ == 1 {
+            return if dir == 0 && index == 0 && self.has_midi_input.get() {
+                kResultTrue
+            } else {
+                kInvalidArgument
+            };
+        }
         if type_ != 0 {
             return kInvalidArgument;
         }
@@ -332,6 +369,52 @@ impl IAudioProcessor for VstAudioProcessor {
                                 .borrow_mut()
                                 .set_parameter(ParameterId(id), NormalizedValue::new(value));
                         }
+                    }
+                }
+            }
+        }
+
+        // Real MIDI note/pressure events, only read at all when the
+        // processor declared a MIDI input bus (see `initialize`) --
+        // matching this crate's block-granular model, every queued event
+        // is applied via `handle_midi` before `process`, not interpolated
+        // to its exact `sample_offset` within the block.
+        if self.has_midi_input.get() {
+            if let Some(input_events) = data.input_events.upgrade() {
+                let count = unsafe { input_events.get_event_count() };
+                let mut processor = self.processor.borrow_mut();
+                for i in 0..count {
+                    let mut event: Event = unsafe { mem::zeroed() };
+                    if unsafe { input_events.get_event(i, &mut event) } != kResultTrue {
+                        continue;
+                    }
+                    let message = if event.type_ == EventTypes::kNoteOnEvent as u16 {
+                        let note_on = unsafe { event.event.note_on };
+                        Some(MidiMessage::NoteOn {
+                            channel: (note_on.channel.max(0) as u8) & 0x0F,
+                            note: note_on.pitch.clamp(0, 127) as u8,
+                            velocity: (note_on.velocity * 127.0).round().clamp(0.0, 127.0) as u8,
+                        })
+                    } else if event.type_ == EventTypes::kNoteOffEvent as u16 {
+                        let note_off = unsafe { event.event.note_off };
+                        Some(MidiMessage::NoteOff {
+                            channel: (note_off.channel.max(0) as u8) & 0x0F,
+                            note: note_off.pitch.clamp(0, 127) as u8,
+                            velocity: (note_off.velocity * 127.0).round().clamp(0.0, 127.0) as u8,
+                        })
+                    } else if event.type_ == EventTypes::kPolyPressureEvent as u16 {
+                        let poly_pressure = unsafe { event.event.poly_pressure };
+                        Some(MidiMessage::PolyphonicKeyPressure {
+                            channel: (poly_pressure.channel.max(0) as u8) & 0x0F,
+                            note: poly_pressure.pitch.clamp(0, 127) as u8,
+                            pressure: (poly_pressure.pressure * 127.0).round().clamp(0.0, 127.0)
+                                as u8,
+                        })
+                    } else {
+                        None
+                    };
+                    if let Some(message) = message {
+                        processor.handle_midi(message);
                     }
                 }
             }

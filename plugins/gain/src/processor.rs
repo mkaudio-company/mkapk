@@ -1,9 +1,17 @@
 //! The plugin's audio processor. This is the ONE place DSP logic lives —
 //! every build target (Standalone/VST3/AU/AAX) shares this same
 //! implementation via the `gui_host::Processor` trait.
-use gui_host::{ChannelLayout, NormalizedValue, ParameterId, ParameterInfo, Processor};
+use gui_host::{
+    ChannelLayout, MidiMessage, NormalizedValue, ParameterId, ParameterInfo, Processor,
+};
 
 pub const GAIN_PARAM: ParameterId = ParameterId(1);
+
+/// MIDI CC 7 is the standard "Channel Volume" controller -- the natural
+/// automation source for a gain parameter, and every format this workspace
+/// targets that wires up real MIDI (see each format's `component`/`view`
+/// module) delivers it here via `Processor::handle_midi`.
+pub const GAIN_MIDI_CC: u8 = 7;
 
 pub struct GainProcessor {
     gain: NormalizedValue,
@@ -70,6 +78,26 @@ impl Processor for GainProcessor {
             NormalizedValue::new(0.0)
         }
     }
+
+    fn accepts_midi(&self) -> bool {
+        true
+    }
+
+    /// Demonstrates MIDI automation: CC 7 (Channel Volume) drives the same
+    /// `gain` parameter a host's own automation lane or this plugin's UI
+    /// would. Every other channel-voice message is ignored -- `GainProcessor`
+    /// is an effect (`plugin_kind` stays the default `Effect`), not an
+    /// instrument, so notes/pitch-bend/etc. have nothing to act on here.
+    fn handle_midi(&mut self, message: MidiMessage) {
+        if let MidiMessage::ControlChange {
+            controller: GAIN_MIDI_CC,
+            value,
+            ..
+        } = message
+        {
+            self.gain = NormalizedValue::new(f64::from(value) / 127.0);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -94,6 +122,41 @@ mod tests {
     #[test]
     fn default_gain_is_unity() {
         let processor = GainProcessor::new();
+        assert_eq!(
+            processor.parameter_value(GAIN_PARAM),
+            NormalizedValue::new(1.0)
+        );
+    }
+
+    #[test]
+    fn midi_cc7_automates_gain() {
+        let mut processor = GainProcessor::new();
+        assert!(processor.accepts_midi());
+
+        processor.handle_midi(MidiMessage::ControlChange {
+            channel: 0,
+            controller: GAIN_MIDI_CC,
+            value: 64,
+        });
+        assert_eq!(
+            processor.parameter_value(GAIN_PARAM),
+            NormalizedValue::new(64.0 / 127.0)
+        );
+    }
+
+    #[test]
+    fn other_midi_messages_do_not_change_gain() {
+        let mut processor = GainProcessor::new();
+        processor.handle_midi(MidiMessage::NoteOn {
+            channel: 0,
+            note: 60,
+            velocity: 100,
+        });
+        processor.handle_midi(MidiMessage::ControlChange {
+            channel: 0,
+            controller: 1,
+            value: 127,
+        });
         assert_eq!(
             processor.parameter_value(GAIN_PARAM),
             NormalizedValue::new(1.0)

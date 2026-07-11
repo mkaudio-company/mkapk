@@ -1,3 +1,4 @@
+use crate::midi::MidiMessage;
 use crate::parameter::{
     LockFreeParameterGateway, NormalizedValue, ParameterId, ParameterInfo, ParameterMessage,
 };
@@ -10,8 +11,21 @@ pub struct ChannelLayout {
     pub output_channels: u32,
 }
 
+/// Whether a `Processor` is an audio effect (has audio input, processes it)
+/// or a virtual instrument (audio output only, driven entirely by MIDI
+/// notes -- `ChannelLayout::input_channels` is typically `0`). Each format
+/// uses this to register the host-appropriate plugin category: VST3's
+/// `kInstrumentCategory` vs `kFxCategory`, AU's `aumu`/`aumf` vs `aufx`
+/// component type, AAX's instrument category property.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum PluginKind {
+    #[default]
+    Effect,
+    Instrument,
+}
+
 /// Real-time audio processing contract. Implementations must not allocate,
-/// lock, or block inside `process`.
+/// lock, or block inside `process` or `handle_midi`.
 pub trait Processor: Send {
     /// Called once before playback starts (or when sample rate/block size
     /// changes), never from the real-time thread while `process` may run
@@ -34,6 +48,29 @@ pub trait Processor: Send {
     fn set_parameter(&mut self, id: ParameterId, value: NormalizedValue);
 
     fn parameter_value(&self, id: ParameterId) -> NormalizedValue;
+
+    /// Effect (default) or Instrument -- see [`PluginKind`].
+    fn plugin_kind(&self) -> PluginKind {
+        PluginKind::Effect
+    }
+
+    /// Whether this processor wants MIDI delivered via `handle_midi`.
+    /// Defaults to `false`: not every effect needs MIDI-CC automation, and
+    /// formats skip wiring up their real-time MIDI event source entirely
+    /// when the processor they carry doesn't need it. An instrument
+    /// (`plugin_kind` returning `Instrument`) should normally also return
+    /// `true` here, since it has no other way to receive notes.
+    fn accepts_midi(&self) -> bool {
+        false
+    }
+
+    /// Handles one real-time MIDI channel-voice message -- see
+    /// [`apply_pending_midi`](crate::midi::apply_pending_midi), which calls
+    /// this once per queued message, per block, before `process`. Only
+    /// called at all when `accepts_midi` returns `true`. Must not
+    /// allocate, lock, or block, same as `process`.
+    #[allow(unused_variables)]
+    fn handle_midi(&mut self, message: MidiMessage) {}
 }
 
 /// Drains parameter changes queued from the UI thread and applies them to

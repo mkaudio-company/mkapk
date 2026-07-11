@@ -18,6 +18,7 @@ void AAX_CALLBACK AaxGeneric_AlgorithmProcessFunction(SAaxGeneric_Alg_Context* c
                                                         const void* inInstancesEnd)
 {
     const int32_t numParams = gui_aax_parameter_count();
+    const bool acceptsMidi = gui_aax_accepts_midi() != 0;
 
     for (SAaxGeneric_Alg_Context* const* walk = inInstancesBegin; walk < inInstancesEnd; ++walk)
     {
@@ -28,6 +29,32 @@ void AAX_CALLBACK AaxGeneric_AlgorithmProcessFunction(SAaxGeneric_Alg_Context* c
         const float* const AAX_RESTRICT pdI = instance->mInputPP[0];
         float* const AAX_RESTRICT pdO = instance->mOutputPP[0];
         float* const meterTaps = *instance->mMetersPP;
+
+        // Gathered here (not inside the `bypass` branch below) so a
+        // bypassed block still drains the MIDI node's queued packets --
+        // otherwise they'd pile up and all arrive at once the next time
+        // the processor is un-bypassed.
+        uint8_t midiBytes[kAaxGeneric_MaxMidiMessages * 3];
+        int32_t numMidiMessages = 0;
+        if (acceptsMidi && instance->mMIDINodeInP != nullptr)
+        {
+            const AAX_CMidiStream* const midiStream = instance->mMIDINodeInP->GetNodeBuffer();
+            if (midiStream != nullptr)
+            {
+                const AAX_CMidiPacket* packet = midiStream->mBuffer;
+                uint32_t remaining = midiStream->mBufferSize;
+                while (remaining > 0 && numMidiMessages < kAaxGeneric_MaxMidiMessages)
+                {
+                    uint8_t* const dest = &midiBytes[numMidiMessages * 3];
+                    dest[0] = packet->mData[0];
+                    dest[1] = packet->mLength > 1 ? packet->mData[1] : 0;
+                    dest[2] = packet->mLength > 2 ? packet->mData[2] : 0;
+                    ++numMidiMessages;
+                    ++packet;
+                    --remaining;
+                }
+            }
+        }
 
         if (bypass)
         {
@@ -45,7 +72,8 @@ void AAX_CALLBACK AaxGeneric_AlgorithmProcessFunction(SAaxGeneric_Alg_Context* c
             {
                 values[i] = *instance->mParamValueP[i];
             }
-            gui_aax_process_block(values, numParams, pdI, pdO, buffersize);
+            gui_aax_process_block(values, numParams, midiBytes, numMidiMessages, pdI, pdO,
+                                   buffersize);
         }
 
         // Accumulate the max value for metering. This will get cleared for

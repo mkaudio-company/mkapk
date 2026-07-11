@@ -64,6 +64,12 @@ impl BundleStatus {
     }
 }
 
+/// Additional `Info.plist` dict entries a format needs (e.g. AU's
+/// `AudioComponents` array), inserted verbatim just before `</dict>`.
+/// Boxed (rather than a bare `fn` pointer) since AU's needs to capture the
+/// component type [`resolve_au_component_type`] resolves.
+type InfoPlistExtra = Box<dyn Fn(&PluginTarget, &str, &str) -> String>;
+
 struct CdylibPluginSpec {
     /// The plugin crate's cargo feature that gates this format's real entry
     /// point in (`vst3` or `au`).
@@ -77,9 +83,7 @@ struct CdylibPluginSpec {
     /// alone.
     entry_symbol: String,
     format_name: &'static str,
-    /// Additional `Info.plist` dict entries this format needs (e.g. AU's
-    /// `AudioComponents` array), inserted verbatim just before `</dict>`.
-    info_plist_extra: fn(target: &PluginTarget, plugin_name: &str, company_name: &str) -> String,
+    info_plist_extra: InfoPlistExtra,
 }
 
 pub fn bundle_vst3() -> ExitCode {
@@ -93,7 +97,7 @@ pub fn bundle_vst3_status() -> BundleStatus {
         package_type: "BNDL",
         entry_symbol: "GetPluginFactory".to_string(),
         format_name: "VST3",
-        info_plist_extra: |_, _, _| String::new(),
+        info_plist_extra: Box::new(|_, _, _| String::new()),
     })
 }
 
@@ -103,20 +107,59 @@ pub fn bundle_au() -> ExitCode {
 
 pub fn bundle_au_status() -> BundleStatus {
     let target = PluginTarget::resolve();
+    let component_type = resolve_au_component_type(&target);
     bundle_cdylib_plugin(CdylibPluginSpec {
         feature: "au",
         bundle_extension: "component",
         package_type: "BNDL",
         entry_symbol: target.au_factory_symbol.clone(),
         format_name: "Audio Unit",
-        info_plist_extra: au_components_plist,
+        info_plist_extra: Box::new(move |target, plugin_name, company_name| {
+            au_components_plist(target, plugin_name, company_name, &component_type)
+        }),
     })
+}
+
+/// Runs the plugin's own `<slug>-au-info` binary (see
+/// `plugins/gain/src/bin/au_info.rs`) to learn its real AU component type
+/// (`aufx`/`aumf`/`aumu`) -- this depends on `Processor::accepts_midi`/
+/// `plugin_kind`, runtime methods on the concrete processor that `bundle.rs`
+/// has no other way to query. Falls back to `"aufx"` (a plain effect, no
+/// MIDI) if the helper binary fails for any reason, since that's this
+/// workspace's original, always-safe default.
+fn resolve_au_component_type(target: &PluginTarget) -> String {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "-p",
+            &target.package_name,
+            "--bin",
+            &target.au_info_bin,
+            "--features",
+            "au",
+        ])
+        .output();
+    match output {
+        Ok(output) if output.status.success() => {
+            let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if text.len() == 4 {
+                text
+            } else {
+                "aufx".to_string()
+            }
+        }
+        _ => "aufx".to_string(),
+    }
 }
 
 /// The `AudioComponents` array AU hosts read to discover this plugin
 /// without loading it first: type/subtype/manufacturer four-character
 /// codes and the `factoryFunction` symbol name, which must match the
 /// plugin's own `gui_au::au_entry!` invocation exactly.
+///
+/// `component_type` (`aufx`/`aumf`/`aumu`) matters for real MIDI delivery:
+/// AU hosts only ever route MIDI to a Music Effect/Music Device component,
+/// never a plain Effect -- see [`resolve_au_component_type`].
 ///
 /// The manufacturer code must contain at least one non-lowercase
 /// character -- `auval` fails validation with "Manufacturer OSType should
@@ -129,7 +172,12 @@ pub fn bundle_au_status() -> BundleStatus {
 /// Info.plist's AudioComponents, key version") after the registrar failed
 /// to parse a string value there, which silently dropped the whole entry
 /// (so the component was never registered at all, not just misdescribed).
-fn au_components_plist(target: &PluginTarget, plugin_name: &str, company_name: &str) -> String {
+fn au_components_plist(
+    target: &PluginTarget,
+    plugin_name: &str,
+    company_name: &str,
+    component_type: &str,
+) -> String {
     let manufacturer = fourcc_code_from(company_name);
     let subtype = fourcc_code_from(&target.slug).to_lowercase();
     format!(
@@ -143,7 +191,7 @@ fn au_components_plist(target: &PluginTarget, plugin_name: &str, company_name: &
             <key>factoryFunction</key>
             <string>{}</string>
             <key>type</key>
-            <string>aufx</string>
+            <string>{component_type}</string>
             <key>subtype</key>
             <string>{subtype}</string>
             <key>manufacturer</key>

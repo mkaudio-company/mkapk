@@ -5,6 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
+# The reference/template plugin `cargo xtask new-plugin` copies from, not a
+# reusable library in its own right -- never meant to be published to
+# crates.io under this name.
+publish = false
 
 [lib]
 name = "gain_plugin"
@@ -19,6 +23,11 @@ required-features = ["standalone"]
 name = "gain-aax-page-table"
 path = "src/bin/aax_page_table.rs"
 required-features = ["aax"]
+
+[[bin]]
+name = "gain-au-info"
+path = "src/bin/au_info.rs"
+required-features = ["au"]
 
 [features]
 default = []

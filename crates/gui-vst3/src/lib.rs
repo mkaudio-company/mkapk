@@ -38,7 +38,10 @@ pub use vst3_sys;
 /// automatable parameter (typically `my_processor.parameters().to_vec()`);
 /// `processor_cid`/`controller_cid` should be built via [`guid`] from two
 /// distinct, randomly generated 16-byte values (never reuse another
-/// plugin's CIDs).
+/// plugin's CIDs). `midi_cc_map` pairs MIDI CC numbers with the parameter
+/// each should automate (VST3's `IMidiMapping` mechanism -- see
+/// `controller::VstEditController`); pass `&[]` for a plugin with no
+/// MIDI-CC automation.
 ///
 /// # Example
 /// ```ignore
@@ -48,6 +51,7 @@ pub use vst3_sys;
 ///     parameters: processor::GainProcessor::new().parameters().to_vec(),
 ///     processor_cid: gui_vst3::guid([0x84, 0xE8, /* ... */]),
 ///     controller_cid: gui_vst3::guid([0xD3, 0x9D, /* ... */]),
+///     midi_cc_map: &[(7, processor::GAIN_PARAM)],
 ///     name: "Gain",
 ///     vendor: "mkaudio",
 ///     url: "https://mkaudio.company",
@@ -64,6 +68,7 @@ macro_rules! vst3_entry {
         parameters: $parameters:expr,
         processor_cid: $processor_cid:expr,
         controller_cid: $controller_cid:expr,
+        midi_cc_map: $midi_cc_map:expr,
         name: $name:expr,
         vendor: $vendor:expr,
         url: $url:expr,
@@ -75,7 +80,11 @@ macro_rules! vst3_entry {
         }
 
         fn __gui_vst3_create_controller() -> *mut ::std::os::raw::c_void {
-            $crate::controller::VstEditController::create_instance($parameters, $make_editor)
+            $crate::controller::VstEditController::create_instance(
+                $parameters,
+                $make_editor,
+                $midi_cc_map,
+            )
         }
 
         #[unsafe(no_mangle)]

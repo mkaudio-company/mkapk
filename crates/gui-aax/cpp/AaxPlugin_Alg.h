@@ -11,6 +11,7 @@
 #define AAXPLUGIN_ALG_H
 
 #include "AAX.h"
+#include "AAX_IMIDINode.h"
 #include "gui_aax_bridge.h"
 
 enum EAaxGeneric_MeterTaps
@@ -36,11 +37,16 @@ constexpr AAX_CTypeID kAaxGeneric_MeterID[eMeterTap_Count] = {
 // parameter packet; only the first `gui_aax_parameter_count()` entries are
 // ever read (all context fields are declared up-front because AAX's field
 // indices are computed at compile time from this struct's layout, but
-// unused trailing slots are simply never dereferenced).
+// unused trailing slots are simply never dereferenced). `mMIDINodeInP` is
+// only populated by AAX (via `AddMIDINode`) when `gui_aax_accepts_midi()`
+// is true -- reading it otherwise would dereference an AAX-side field that
+// was never wired up, so `AaxGeneric_AlgorithmProcessFunction` gates on the
+// same getter before touching it.
 struct SAaxGeneric_Alg_Context
 {
     int32_t* mCtrlBypassP;                        // Master bypass control message
     float* mParamValueP[kAaxGeneric_MaxParams];    // One packet per parameter
+    AAX_IMIDINode* mMIDINodeInP;                   // MIDI input node (only if accepts_midi)
 
     float** mInputPP;    // Audio signal destination
     float** mOutputPP;   // Audio signal source
@@ -60,6 +66,7 @@ enum EAaxGeneric_Alg_PortID
 {
     eAlgPortID_BypassIn = AAX_FIELD_INDEX(SAaxGeneric_Alg_Context, mCtrlBypassP),
     eAlgPortID_Param0 = AAX_FIELD_INDEX(SAaxGeneric_Alg_Context, mParamValueP[0]),
+    eAlgPortID_MIDINodeIn = AAX_FIELD_INDEX(SAaxGeneric_Alg_Context, mMIDINodeInP),
 
     eAlgFieldID_AudioIn = AAX_FIELD_INDEX(SAaxGeneric_Alg_Context, mInputPP),
     eAlgFieldID_AudioOut = AAX_FIELD_INDEX(SAaxGeneric_Alg_Context, mOutputPP),

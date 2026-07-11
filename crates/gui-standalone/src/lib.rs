@@ -19,8 +19,9 @@ use std::time::Duration;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use gui_core::Sizef;
 use gui_host::{
-    EditorHost, LockFreeParameterGateway, NormalizedValue, ParameterGateway, ParameterId,
-    PeakMeter, PluginEditor, Processor, apply_pending_parameters,
+    EditorHost, LockFreeParameterGateway, MidiEventQueue, MidiMessage, NormalizedValue,
+    ParameterGateway, ParameterId, PeakMeter, PluginEditor, Processor, apply_pending_midi,
+    apply_pending_parameters,
 };
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Producer, Split};
@@ -156,12 +157,41 @@ pub fn run<P, E>(
 /// remainder is zero-filled) rather than growing allocations at run time.
 const MAX_BLOCK_SIZE: usize = 4096;
 
-/// Both `cpal` streams behind [`build_audio_stream`]. Kept alive together
-/// by whoever calls `build_audio_stream`: dropping either one stops it.
+/// Both `cpal` streams plus the real MIDI input connection (if any) behind
+/// [`build_audio_stream`]. Kept alive together by whoever calls
+/// `build_audio_stream`: dropping any of them stops it.
 #[allow(dead_code)]
 struct AudioStreams {
     output: cpal::Stream,
     input: Option<cpal::Stream>,
+    midi_input: Option<midir::MidiInputConnection<()>>,
+}
+
+/// Opens the first available real MIDI input port (no picker UI yet, same
+/// as this crate's non-macOS audio-input fallback) and forwards every
+/// channel-voice message it receives into `queue`. Returns `None` if no
+/// MIDI input exists in this environment -- not a hard requirement, since a
+/// processor that accepts MIDI should still run (just never receive any)
+/// when there's no MIDI hardware/virtual port to read from.
+fn open_midi_input(queue: Arc<MidiEventQueue>) -> Option<midir::MidiInputConnection<()>> {
+    let input = midir::MidiInput::new("gui-standalone").ok()?;
+    let ports = input.ports();
+    let port = ports.first()?;
+    input
+        .connect(
+            port,
+            "gui-standalone-input",
+            move |_timestamp_micros, bytes, ()| {
+                let status = *bytes.first().unwrap_or(&0);
+                let data1 = bytes.get(1).copied().unwrap_or(0);
+                let data2 = bytes.get(2).copied().unwrap_or(0);
+                if let Some(message) = MidiMessage::from_bytes(status, data1, data2) {
+                    queue.push(message);
+                }
+            },
+            (),
+        )
+        .ok()
 }
 
 /// Number of `MAX_BLOCK_SIZE`-sized blocks of slack the input->output ring
@@ -193,6 +223,19 @@ where
     processor.prepare(sample_rate, MAX_BLOCK_SIZE);
 
     let wanted_input_channels = processor.channel_layout().input_channels as usize;
+
+    // Only open a MIDI input port at all when the processor actually wants
+    // MIDI -- an effect with no use for it shouldn't pay for a MIDI input
+    // thread or claim a system MIDI port it never reads.
+    let midi_queue = processor
+        .accepts_midi()
+        .then(|| Arc::new(MidiEventQueue::default()));
+    let midi_input = midi_queue.as_ref().cloned().and_then(open_midi_input);
+    if midi_queue.is_some() && midi_input.is_none() {
+        eprintln!(
+            "gui-standalone: this processor accepts MIDI, but no MIDI input port was found in this environment"
+        );
+    }
 
     // Try to open a real capture stream matching the output's sample rate.
     // If none was selected, or the selected device can't supply that rate,
@@ -256,6 +299,9 @@ where
             &output_stream_config,
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                 apply_pending_parameters(&gateway, &mut processor);
+                if let Some(queue) = midi_queue.as_ref() {
+                    apply_pending_midi(queue, &mut processor);
+                }
 
                 let channels = output_channels.max(1);
                 let frames = (data.len() / channels).min(MAX_BLOCK_SIZE);
@@ -326,5 +372,6 @@ where
     Some(AudioStreams {
         output: output_stream,
         input: input_stream,
+        midi_input,
     })
 }

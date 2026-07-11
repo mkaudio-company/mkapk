@@ -5,6 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
+description.workspace = true
+repository.workspace = true
+documentation.workspace = true
+categories.workspace = true
+keywords.workspace = true
 
 [dependencies]
 gui-core = { workspace = true }
@@ -12,6 +17,10 @@ gui-host = { workspace = true }
 gui-test-host = { workspace = true }
 cpal = "0.15"
 ringbuf = "0.5"
+# Real MIDI input, same reasoning as cpal for audio: device enumeration and
+# per-OS driver quirks (CoreMIDI/WinMM/ALSA) are real risk to hand-roll
+# blind, so this leans on a mature, widely-used crate instead.
+midir = "0.10"
 
 # Device-picker UI (macOS only for now: mkgraphic's cross-platform Window/App
 # facade doesn't wire up Windows yet as of 0.3.0, even though platform code

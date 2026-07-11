@@ -46,6 +46,10 @@ gui_vst3::vst3_entry! {
         0x92, 0x1E, 0x0D, 0x83, 0xE1, 0x93, 0x48, 0x69, 0xA9, 0xF0, 0x87, 0xF6, 0x14, 0xED, 0xE0,
         0xF5,
     ]),
+    // CC 7 (Channel Volume) automates the same gain parameter this crate's
+    // UI and `GainProcessor::handle_midi` respond to -- see
+    // `processor::GAIN_MIDI_CC`.
+    midi_cc_map: &[(processor::GAIN_MIDI_CC, processor::GAIN_PARAM)],
     name: "Gain",
     vendor: "mkaudio",
     url: "https://mkaudio.company",

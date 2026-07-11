@@ -245,6 +245,10 @@ impl Identity {
                 format!("{}Processor", self.pascal),
             ),
             ("GainEditor".to_string(), format!("{}Editor", self.pascal)),
+            (
+                "GAIN_MIDI_CC".to_string(),
+                format!("{}_MIDI_CC", self.upper),
+            ),
             ("GAIN_PARAM".to_string(), format!("{}_PARAM", self.upper)),
             (
                 "com.mkaudio.aax.gain".to_string(),
@@ -347,6 +351,13 @@ fn generate(
             identity,
         )?;
     }
+    if has("au") {
+        copy_and_substitute(
+            &template_dir.join("src/bin/au_info.rs"),
+            &plugin_dir.join("src/bin/au_info.rs"),
+            identity,
+        )?;
+    }
 
     fs::write(
         plugin_dir.join("Cargo.toml"),
@@ -387,6 +398,12 @@ fn render_cargo_toml(identity: &Identity, formats: &[String]) -> String {
     if has("aax") {
         bins.push_str(&format!(
             "[[bin]]\nname = \"{slug}-aax-page-table\"\npath = \"src/bin/aax_page_table.rs\"\nrequired-features = [\"aax\"]\n\n",
+            slug = identity.slug
+        ));
+    }
+    if has("au") {
+        bins.push_str(&format!(
+            "[[bin]]\nname = \"{slug}-au-info\"\npath = \"src/bin/au_info.rs\"\nrequired-features = [\"au\"]\n\n",
             slug = identity.slug
         ));
     }
@@ -482,6 +499,9 @@ fn render_lib_rs(identity: &Identity, formats: &[String]) -> String {
              \x20\x20\x20\x20}},\n\
              \x20\x20\x20\x20processor_cid: gui_vst3::guid([{processor_cid}]),\n\
              \x20\x20\x20\x20controller_cid: gui_vst3::guid([{controller_cid}]),\n\
+             \x20\x20\x20\x20// No MIDI-CC automation by default -- e.g. &[(7,\n\
+             \x20\x20\x20\x20// processor::SOME_PARAM)] maps CC 7 to a parameter.\n\
+             \x20\x20\x20\x20midi_cc_map: &[],\n\
              \x20\x20\x20\x20name: \"{display_name}\",\n\
              \x20\x20\x20\x20vendor: \"{company}\",\n\
              \x20\x20\x20\x20url: \"https://{company_slug}.example.com\",\n\

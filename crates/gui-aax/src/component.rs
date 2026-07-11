@@ -29,11 +29,15 @@
 //! state (e.g. a filter's delay line) would need AAX's private-data
 //! instance-lifecycle (`ResetFieldData`) instead, which this bridge does
 //! not implement.
-use gui_host::{NormalizedValue, ParameterId, Processor};
+use gui_host::{MidiMessage, NormalizedValue, ParameterId, Processor};
 
 /// Fixed capacity for the number of parameters this bridge can expose to
 /// AAX. Must match `kAaxGeneric_MaxParams` in `cpp/gui_aax_bridge.h` exactly.
 pub const MAX_PARAMS: usize = 16;
+
+pub fn accepts_midi<P: Processor>(make_processor: &mut impl FnMut() -> P) -> bool {
+    make_processor().accepts_midi()
+}
 
 pub fn parameter_count<P: Processor>(make_processor: &mut impl FnMut() -> P) -> i32 {
     let processor = make_processor();
@@ -114,19 +118,25 @@ pub fn parameter_step_count<P: Processor>(
 }
 
 /// Applies `values[..num_values]` (in the same order `Processor::parameters()`
-/// enumerates them) to a freshly constructed `P`, then processes one mono
-/// block in place.
+/// enumerates them) and up to `num_midi_messages` queued MIDI messages (each
+/// a `status, data1, data2` byte triple in `midi_bytes`) to a freshly
+/// constructed `P`, then processes one mono block in place.
 ///
 /// # Safety
 /// `values` must be valid for `num_values` `f32` reads (or null, in which
-/// case parameters are left at their defaults). `input` and `output` must
-/// each point to at least `num_frames` valid, initialized `f32` samples --
-/// the contract AAX's real-time process callback already upholds via
-/// `SAaxGeneric_Alg_Context`'s `mInputPP`/`mOutputPP`/`mBufferSize` fields.
+/// case parameters are left at their defaults). `midi_bytes` must be valid
+/// for `num_midi_messages * 3` byte reads (or null/zero, in which case no
+/// MIDI is applied). `input` and `output` must each point to at least
+/// `num_frames` valid, initialized `f32` samples -- the contract AAX's
+/// real-time process callback already upholds via `SAaxGeneric_Alg_Context`'s
+/// `mInputPP`/`mOutputPP`/`mBufferSize` fields.
+#[allow(clippy::too_many_arguments)]
 pub unsafe fn process_block<P: Processor>(
     mut make_processor: impl FnMut() -> P,
     values: *const f32,
     num_values: i32,
+    midi_bytes: *const u8,
+    num_midi_messages: i32,
     input: *const f32,
     output: *mut f32,
     num_frames: i32,
@@ -149,6 +159,18 @@ pub unsafe fn process_block<P: Processor>(
         let values_slice = unsafe { std::slice::from_raw_parts(values, n) };
         for i in 0..n {
             processor.set_parameter(ids[i], NormalizedValue::new(f64::from(values_slice[i])));
+        }
+    }
+
+    if !midi_bytes.is_null() && num_midi_messages > 0 {
+        // SAFETY: caller guarantees `midi_bytes` is valid for
+        // `num_midi_messages * 3` bytes.
+        let bytes =
+            unsafe { std::slice::from_raw_parts(midi_bytes, num_midi_messages as usize * 3) };
+        for chunk in bytes.chunks_exact(3) {
+            if let Some(message) = MidiMessage::from_bytes(chunk[0], chunk[1], chunk[2]) {
+                processor.handle_midi(message);
+            }
         }
     }
 
@@ -273,6 +295,8 @@ mod tests {
                 TwoParamProcessor::new,
                 values.as_ptr(),
                 values.len() as i32,
+                std::ptr::null(),
+                0,
                 input.as_ptr(),
                 output.as_mut_ptr(),
                 input.len() as i32,
@@ -288,6 +312,8 @@ mod tests {
                 TwoParamProcessor::new,
                 std::ptr::null(),
                 0,
+                std::ptr::null(),
+                0,
                 input.as_ptr(),
                 output.as_mut_ptr(),
                 input.len() as i32,
@@ -295,5 +321,87 @@ mod tests {
         }
         assert_eq!(output, [1.0, 1.0, 1.0]);
         let _ = &mut input;
+    }
+
+    #[test]
+    fn process_block_applies_midi_before_processing() {
+        struct MidiCcProcessor {
+            gain: NormalizedValue,
+            parameters: [gui_host::ParameterInfo; 1],
+        }
+        impl Processor for MidiCcProcessor {
+            fn prepare(&mut self, _sample_rate: f64, _max_block_size: usize) {}
+            fn process(&mut self, inputs: &[&[f32]], outputs: &mut [&mut [f32]]) {
+                let gain = self.gain.get() as f32;
+                for (input, output) in inputs.iter().zip(outputs.iter_mut()) {
+                    for (sample_in, sample_out) in input.iter().zip(output.iter_mut()) {
+                        *sample_out = sample_in * gain;
+                    }
+                }
+            }
+            fn reset(&mut self) {}
+            fn channel_layout(&self) -> gui_host::ChannelLayout {
+                gui_host::ChannelLayout {
+                    input_channels: 1,
+                    output_channels: 1,
+                }
+            }
+            fn parameters(&self) -> &[gui_host::ParameterInfo] {
+                &self.parameters
+            }
+            fn set_parameter(&mut self, _id: ParameterId, value: NormalizedValue) {
+                self.gain = value;
+            }
+            fn parameter_value(&self, _id: ParameterId) -> NormalizedValue {
+                self.gain
+            }
+            fn accepts_midi(&self) -> bool {
+                true
+            }
+            fn handle_midi(&mut self, message: MidiMessage) {
+                if let MidiMessage::ControlChange {
+                    controller: 7,
+                    value,
+                    ..
+                } = message
+                {
+                    self.gain = NormalizedValue::new(f64::from(value) / 127.0);
+                }
+            }
+        }
+
+        let make = || MidiCcProcessor {
+            gain: NormalizedValue::new(1.0),
+            parameters: [gui_host::ParameterInfo {
+                id: ParameterId(1),
+                name: "Gain",
+                default_value: NormalizedValue::new(1.0),
+                min_value: NormalizedValue::new(0.0),
+                max_value: NormalizedValue::new(1.0),
+                step_count: None,
+            }],
+        };
+
+        let input = [1.0_f32, 1.0, 1.0];
+        let mut output = [0.0_f32; 3];
+        // Status 0xB0 (CC, channel 0), controller 7, value 64 -> gain 64/127.
+        let midi_bytes = [0xB0_u8, 7, 64];
+
+        unsafe {
+            process_block(
+                make,
+                std::ptr::null(),
+                0,
+                midi_bytes.as_ptr(),
+                1,
+                input.as_ptr(),
+                output.as_mut_ptr(),
+                input.len() as i32,
+            );
+        }
+        let expected = 64.0_f32 / 127.0;
+        for sample in output {
+            assert!((sample - expected).abs() < 1e-6);
+        }
     }
 }

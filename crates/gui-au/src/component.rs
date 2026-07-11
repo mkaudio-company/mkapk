@@ -6,17 +6,24 @@
 //!
 //! Scope: a minimal, real, `kAudioUnitType_Effect`-style Audio Unit --
 //! fixed channel counts (from `Processor::channel_layout`), one input
-//! element, one output element, `Float32` non-interleaved only, no MIDI.
-//! Supports enough properties/selectors for a host to load, connect,
-//! automate, and render real audio through it: `Initialize`/
-//! `Uninitialize`/`Reset`, stream format, parameter list/info, supported
-//! channel counts, max frames per slice, the render callback used to pull
-//! input (the AUv2 "pull" model), `Render` itself, and `CocoaUI` (wired to
-//! `gui-au`'s existing Cocoa view code via a small private property -- see
+//! element, one output element, `Float32` non-interleaved only. Supports
+//! enough properties/selectors for a host to load, connect, automate, and
+//! render real audio through it: `Initialize`/`Uninitialize`/`Reset`,
+//! stream format, parameter list/info, supported channel counts, max
+//! frames per slice, the render callback used to pull input (the AUv2
+//! "pull" model), `Render` itself, and `CocoaUI` (wired to `gui-au`'s
+//! existing Cocoa view code via a small private property -- see
 //! `editor.rs`'s `AUCocoaUIBase` factory class).
 //!
+//! Real MIDI delivery (`MusicDeviceMIDIEvent`, see
+//! `K_MUSIC_DEVICE_MIDI_EVENT_SELECT`/`au_music_device_midi_event`) is
+//! wired up whenever `Processor::accepts_midi` returns `true`; `xtask`'s
+//! `bundle-au` then registers the component as `aumf`/`aumu` instead of
+//! `aufx` (see `plugins/gain/src/bin/au_info.rs`), since real hosts only
+//! ever route MIDI to a Music Effect/Music Device component.
+//!
 //! Not implemented (spec-legal to omit; hosts fall back to defaults/ignore):
-//! factory presets, class-info (session state) persistence, MIDI.
+//! factory presets, class-info (session state) persistence.
 //!
 //! **Verified against Apple's real `auval`** (not just reviewed against
 //! headers): several real bugs were found and fixed this way that would
@@ -38,7 +45,11 @@
 //!   returning "unimplemented" via `Lookup` failed the recommended
 //!   properties section);
 //! - `kAudioUnitProperty_CocoaUI`'s bundle location can't be left null in
-//!   practice (see `own_bundle_url`, resolved via `dladdr`).
+//!   practice (see `own_bundle_url`, resolved via `dladdr`);
+//! - `auval`'s "Test MIDI" step only exercises `MusicDeviceMIDIEvent` at
+//!   all when the component is registered as `aumf`/`aumu`, not `aufx` --
+//!   confirmed by first seeing it silently skipped, then real, passing
+//!   MIDI dispatch once `bundle-au` switched the registered type.
 #![cfg(target_os = "macos")]
 
 use core::ffi::{c_char, c_void};
@@ -48,8 +59,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use gui_host::{
-    LockFreeParameterGateway, NormalizedValue, ParameterGateway, ParameterId, ParameterInfo,
-    PeakMeter, PluginEditor, Processor, apply_pending_parameters,
+    LockFreeParameterGateway, MidiEventQueue, MidiMessage, NormalizedValue, ParameterGateway,
+    ParameterId, ParameterInfo, PeakMeter, PluginEditor, Processor, apply_pending_midi,
+    apply_pending_parameters,
 };
 
 /// A custom, non-Apple-reserved property ID (Apple's own IDs top out in the
@@ -94,6 +106,14 @@ struct AuState {
     output_scratch: Vec<Vec<f32>>,
     property_listeners: Vec<PropertyListener>,
     render_notifies: Vec<RenderNotify>,
+    /// `Some` only when `Processor::accepts_midi` returns `true` (checked
+    /// once, in `create_instance`): real MIDI delivered via
+    /// `MusicDeviceMIDIEvent` (`au_music_device_midi_event`) is pushed
+    /// here, then drained into `processor.handle_midi` at the start of
+    /// every `Render` call. A real, thread-safe queue rather than a plain
+    /// `Vec` because nothing in the AU spec guarantees a host calls
+    /// `MusicDeviceMIDIEvent` from the same thread as `Render`.
+    midi_queue: Option<MidiEventQueue>,
     au_instance: au_sys::AudioUnit,
 }
 
@@ -900,6 +920,9 @@ unsafe extern "C" fn au_render(
     }
 
     apply_pending_parameters(&state.gateway, &mut *state.processor);
+    if let Some(queue) = state.midi_queue.as_ref() {
+        apply_pending_midi(queue, &mut *state.processor);
+    }
 
     // The host allocates `io_data` with one `AudioBuffer` per output
     // channel (matching `kAudioUnitProperty_StreamFormat`'s output scope),
@@ -1111,6 +1134,51 @@ unsafe extern "C" fn au_schedule_parameters(
     au_sys::noErr
 }
 
+/// Not in `au-sys` (no Music Device/Music Effect bindings exist there at
+/// all yet): the real dispatch selector for MIDI event delivery, from the
+/// real `MusicDevice.h` header (`kMusicDeviceRange = 0x0100`,
+/// `kMusicDeviceMIDIEventSelect = kMusicDeviceRange | 0x01`), confirmed
+/// directly against the macOS SDK rather than guessed, matching this
+/// file's existing convention for hand-declared selectors/structs (see
+/// `AudioUnitParameterEvent`/`AudioUnitConnection` above).
+const K_MUSIC_DEVICE_MIDI_EVENT_SELECT: au_sys::SInt16 = 0x0101;
+
+/// `MusicDeviceMIDIEventProc`'s real C signature (`MusicDevice.h`): a plain
+/// 3-byte MIDI 1.0 message (`inStatus`/`inData1`/`inData2`) plus a sample
+/// offset within the *next* `Render` call this event should take effect
+/// at. This crate applies every queued message at the very start of the
+/// next `Render` instead (see `au_render`), the same block-granular
+/// simplification `au_schedule_parameters` already makes for automation,
+/// so `in_offset_sample_frame` is accepted but not used.
+type MusicDeviceMIDIEventProc = unsafe extern "C" fn(
+    self_ptr: *mut c_void,
+    in_status: au_sys::UInt32,
+    in_data1: au_sys::UInt32,
+    in_data2: au_sys::UInt32,
+    in_offset_sample_frame: au_sys::UInt32,
+) -> au_sys::OSStatus;
+
+unsafe extern "C" fn au_music_device_midi_event(
+    self_ptr: *mut c_void,
+    in_status: au_sys::UInt32,
+    in_data1: au_sys::UInt32,
+    in_data2: au_sys::UInt32,
+    _in_offset_sample_frame: au_sys::UInt32,
+) -> au_sys::OSStatus {
+    let state = unsafe { &mut (*(self_ptr as *mut AuInstance)).state };
+    let Some(queue) = state.midi_queue.as_ref() else {
+        // Only reachable if a host calls this without having checked
+        // `accepts_midi` some other way first; not an error worth failing
+        // loudly for, just nothing to queue.
+        return au_sys::noErr;
+    };
+    if let Some(message) = MidiMessage::from_bytes(in_status as u8, in_data1 as u8, in_data2 as u8)
+    {
+        queue.push(message);
+    }
+    au_sys::noErr
+}
+
 unsafe extern "C" fn au_lookup(selector: au_sys::SInt16) -> Option<au_sys::AudioComponentMethod> {
     // SAFETY: every arm transmutes a concrete, selector-matched
     // `AudioUnit*Proc` function pointer into the opaque, variadic
@@ -1190,6 +1258,10 @@ unsafe extern "C" fn au_lookup(selector: au_sys::SInt16) -> Option<au_sys::Audio
                     au_sys::AudioComponentMethod,
                 >(au_schedule_parameters))
             }
+            K_MUSIC_DEVICE_MIDI_EVENT_SELECT => Some(mem::transmute::<
+                MusicDeviceMIDIEventProc,
+                au_sys::AudioComponentMethod,
+            >(au_music_device_midi_event)),
             _ => None,
         }
     }
@@ -1208,6 +1280,7 @@ where
 {
     let processor = make_processor();
     let layout = processor.channel_layout();
+    let midi_queue = processor.accepts_midi().then(MidiEventQueue::default);
     const DEFAULT_MAX_FRAMES: u32 = 512;
 
     let state = AuState {
@@ -1234,6 +1307,7 @@ where
         ],
         property_listeners: Vec::new(),
         render_notifies: Vec::new(),
+        midi_queue,
         au_instance: std::ptr::null_mut(),
     };
 

@@ -44,6 +44,19 @@ static void DescribeAlgorithmComponent(AAX_IComponentDescriptor* outDesc)
         err = outDesc->AddDataInPort(eAlgPortID_Param0 + i, sizeof(float));
     }
 
+    // Only registered when the processor actually wants MIDI (see
+    // `gui_host::Processor::accepts_midi`) -- unlike the parameter slots
+    // above, a plain effect with no use for MIDI shouldn't show a "MIDI In"
+    // node in the host at all. Native-only (per this shim's own scope):
+    // the AAX SDK's own docs note MIDI isn't delivered to DSP algorithms,
+    // only AAX Native, which is exactly what `Gain_Defs.h`'s FourCC-only
+    // (no TI) identity already committed to.
+    if (gui_aax_accepts_midi())
+    {
+        err = outDesc->AddMIDINode(eAlgPortID_MIDINodeIn, AAX_eMIDINodeType_LocalInput, "MIDI In",
+                                    0xFFFF);
+    }
+
     AAX_IPropertyMap* const properties = outDesc->NewPropertyMap();
     if (!properties)
         err = AAX_ERROR_NULL_OBJECT;

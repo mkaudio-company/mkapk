@@ -26,6 +26,8 @@ license = "MIT OR Apache-2.0"
 description = "Cross-platform audio plugin build and packaging system (Standalone/VST3/AU/AAX) with a shared retained-mode GUI framework"
 repository = "https://github.com/mkaudio-company/audio-processor-rs"
 documentation = "https://docs.rs/audio-processor-rs"
+categories = ["multimedia::audio", "gui", "development-tools::ffi", "os::macos-apis", "api-bindings"]
+keywords = ["audio-plugin", "vst3", "au", "aax", "midi"]
 
 [workspace.dependencies]
 gui-core = { path = "crates/gui-core", version = "0.1.0" }

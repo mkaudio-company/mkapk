@@ -28,6 +28,8 @@ Underneath the single project, this workspace also provides the platform-agnosti
 | VST3 entry point | Implemented & validated | Real `IPluginFactory`/`IComponent`/`IAudioProcessor`/`IEditController` via `vst3-sys`, gated by `VST3_SDK_PATH`; 47/47 on Steinberg's own `validator` |
 | AUv2 entry point | Implemented & validated | Real `AudioComponentPlugInInterface` (hand-written dispatch over `au-sys` bindings) + `AUCocoaUIBase` custom UI, no SDK needed; passes Apple's `auval` |
 | AAX entry point | Implemented & validated | Real `AAX_CEffectParameters`/`AAX_CMain` via a generic C++ shim (gated by `AAX_SDK_PATH`); 6/6 on Avid's own `AAXValidator.framework` |
+| Real MIDI (automation + instruments) | Implemented & validated | `Processor::handle_midi` wired to real MIDI across all 4 formats -- see [MIDI support](#midi-support) |
+| `cargo xtask new-plugin` scaffolding | Implemented | Generates a new `plugins/<slug>` crate from `plugins/gain`'s template, fresh CIDs/FourCCs, trimmed to the formats you pick |
 | Windows Win32 + Direct2D backend | Implemented | Runtime validation pending Windows host |
 | macOS AppKit + CoreGraphics backend | Implemented & tested | Custom `drawRect:`-based `NSView` (not `lockFocus`, which doesn't reliably composite) |
 | Real mouse input | Implemented | `mouseDown:`/`mouseDragged:`/`mouseUp:` on macOS, `WM_LBUTTONDOWN`/`UP`/`MOUSEMOVE` on Windows test host |
@@ -205,6 +207,21 @@ Unlike VST3/AU, whose COM-vtable/C-ABI interfaces Rust implements directly, AAX'
 
 The AAX SDK's own CMake tooling (`aax_plugin()` in `AAX_SDKFunctions.cmake`) compiles this shim, links it against the Rust staticlib xtask builds, and assembles the `.aaxplugin` bundle. Two genuine bugs in the SDK's CMake tooling were found and worked around along the way (not patched in the vendored SDK): its example projects' CMakeLists.txt files omit `Interfaces/AAX_Exports.cpp` (present in every one of the SDK's own Xcode/VS templates, needed for the real `ACFStartup`/`ACFRegisterPlugin`/etc. exports), and the top-level SDK CMakeLists.txt unconditionally references an `aax_wrapper` target that only exists when `SMTG_AAX_SDK_PATH` is set.
 
+### MIDI support
+
+`gui_host::Processor` has two MIDI-related methods, both defaulting to a no-op so existing effects don't need to change: `accepts_midi(&self) -> bool` (whether this processor wants MIDI at all) and `handle_midi(&mut self, message: MidiMessage)` (called once per queued channel-voice message — Note On/Off, Poly Pressure, Control Change, Program Change, Channel Pressure, Pitch Bend — before `process` each block, mirroring how parameter automation is already applied once per block rather than sample-accurately). `plugin_kind() -> PluginKind::{Effect, Instrument}` lets a processor declare itself an instrument (no audio input, driven entirely by MIDI notes) for hosts that distinguish the two.
+
+`GainProcessor` demonstrates the automation half: MIDI CC 7 (Channel Volume) drives the same `gain` parameter its UI and host automation do (`handle_midi` matching `MidiMessage::ControlChange { controller: GAIN_MIDI_CC, .. }`). Real, format-specific wiring for all four targets:
+
+| Format | Mechanism |
+|--------|-----------|
+| VST3 | Notes/pressure via a real `kEvent` input bus + `IEventList` (`VstAudioProcessor::process`); CC automation via `IMidiMapping::get_midi_controller_assignment` on the controller (VST3's idiomatic mechanism — there's no raw CC event in `IEventList`), configured per plugin via `vst3_entry!`'s `midi_cc_map: &[(cc, ParameterId)]` field |
+| AUv2 | Real `MusicDeviceMIDIEvent` dispatch (selector `kMusicDeviceMIDIEventSelect`, hand-declared — not in `au-sys`) queued into a lock-free `MidiEventQueue` and drained at the start of `Render`. AU hosts only route MIDI to a Music Effect/Music Device component, never a plain Effect, so `xtask bundle-au` runs the plugin's own `<slug>-au-info` binary to learn its real component type (`aufx`/`aumf`/`aumu`) instead of assuming `aufx` |
+| AAX | Real `AAX_IMIDINode`/`AAX_CMidiStream` packet queue, registered via `AddMIDINode` only when a processor wants it (so a plain effect gets no "MIDI In" node at all) |
+| Standalone | Real MIDI input via [`midir`](https://crates.io/crates/midir) (same reasoning as `cpal` for audio: device/driver quirks are real risk to hand-roll blind), opening the first available port and feeding a lock-free queue the audio callback drains each block |
+
+Validated for real: VST3 stays 47/47 on Steinberg's `validator` (which confirms the `kEvent` bus and `IMidiMapping` assignment directly); AAX stays 6/6 on Avid's `AAXValidator.framework`; AU's real `auval` run includes a dedicated **"Test MIDI" step that only exercises `MusicDeviceMIDIEvent` at all once the component is registered as `aumf`** — confirmed by first seeing it silently skipped, then genuinely passing once `bundle-au`'s component-type resolution landed.
+
 ## Platform Support Matrix
 
 | Target | Build | Runtime Tests | Notes |
@@ -261,6 +278,8 @@ VST3 builds are gated by the `vst3` feature and `VST3_SDK_PATH`; AAX builds are 
 ## License
 
 This project is licensed under the MIT OR Apache-2.0 license. See `LICENSE-MIT` and `LICENSE-APACHE`.
+
+Every `crates/gui-*` library crate carries real `description`/`categories`/`keywords` (inherited from `[workspace.package]`, `cargo package -p <crate>` confirmed publishable). `xtask` and `plugins/gain` are marked `publish = false` — a workspace-internal build tool and the template `cargo xtask new-plugin` copies from, neither meant to be published under those names.
 
 ## Acknowledgments
 

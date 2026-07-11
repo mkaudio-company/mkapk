@@ -127,26 +127,36 @@ macro_rules! aax_entry {
             $crate::component::parameter_step_count(&mut || $make_processor(), index)
         }
 
+        #[unsafe(no_mangle)]
+        pub extern "C" fn gui_aax_accepts_midi() -> i32 {
+            $crate::component::accepts_midi(&mut || $make_processor()) as i32
+        }
+
         /// # Safety
         /// `values` must be valid for `num_values` reads (or null);
-        /// `input`/`output` must each be valid for `num_frames` samples --
-        /// upheld by this crate's C++ shim, the only caller, per AAX's own
-        /// `SAaxGeneric_Alg_Context` contract.
+        /// `midi_bytes` must be valid for `num_midi_messages * 3` reads (or
+        /// null/zero); `input`/`output` must each be valid for `num_frames`
+        /// samples -- upheld by this crate's C++ shim, the only caller, per
+        /// AAX's own `SAaxGeneric_Alg_Context` contract.
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn gui_aax_process_block(
             values: *const f32,
             num_values: i32,
+            midi_bytes: *const u8,
+            num_midi_messages: i32,
             input: *const f32,
             output: *mut f32,
             num_frames: i32,
         ) {
             // SAFETY: caller (this function's own doc comment) guarantees
-            // `values`/`input`/`output` validity.
+            // `values`/`midi_bytes`/`input`/`output` validity.
             unsafe {
                 $crate::component::process_block(
                     || $make_processor(),
                     values,
                     num_values,
+                    midi_bytes,
+                    num_midi_messages,
                     input,
                     output,
                     num_frames,

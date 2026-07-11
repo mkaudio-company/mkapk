@@ -15,6 +15,12 @@
 /// sides size their real-time context/arrays from this one constant.
 constexpr int32_t kAaxGeneric_MaxParams = 16;
 
+/// Fixed capacity for the number of MIDI channel-voice messages this
+/// bridge delivers per real-time block. AAX's own MIDI node buffer can in
+/// principle hold more in one block; any excess is simply not read this
+/// block (same "generic, fixed-capacity" tradeoff as `kAaxGeneric_MaxParams`).
+constexpr int32_t kAaxGeneric_MaxMidiMessages = 32;
+
 extern "C" {
 
 // Plugin identity, supplied by whichever plugin invoked `aax_entry!`.
@@ -33,12 +39,21 @@ int32_t gui_aax_parameter_name(int32_t index, char* out, int32_t out_capacity);
 float gui_aax_parameter_default(int32_t index);
 int32_t gui_aax_parameter_step_count(int32_t index);
 
+// Whether the processor wants a MIDI input node registered at all (see
+// `gui_host::Processor::accepts_midi`); returns 0/1 rather than a real
+// `bool` to keep this header C-ABI-plain like everything else in it.
+int32_t gui_aax_accepts_midi();
+
 // The real-time process bridge: applies `values[0..num_values)` (in the same
 // order `gui_aax_parameter_id`/`_name`/etc. enumerate them) to a fresh
-// processor instance, then processes one mono block of `num_frames` samples
-// from `input` into `output` in place.
-void gui_aax_process_block(const float* values, int32_t num_values, const float* input,
-                            float* output, int32_t num_frames);
+// processor instance, applies up to `num_midi_messages` queued MIDI 1.0
+// channel-voice messages (each a `status, data1, data2` byte triple packed
+// into `midi_bytes`, unused trailing bytes zero for 2-byte messages), then
+// processes one mono block of `num_frames` samples from `input` into
+// `output` in place.
+void gui_aax_process_block(const float* values, int32_t num_values, const uint8_t* midi_bytes,
+                            int32_t num_midi_messages, const float* input, float* output,
+                            int32_t num_frames);
 
 }  // extern "C"
 

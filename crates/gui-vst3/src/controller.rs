@@ -33,7 +33,7 @@ use vst3_sys::base::{
     FIDString, IBStream, IPluginBase, kResultFalse, kResultOk, kResultTrue, tresult,
 };
 use vst3_sys::utils::SharedVstPtr;
-use vst3_sys::vst::{IComponentHandler, IEditController, TChar};
+use vst3_sys::vst::{CtrlNumber, IComponentHandler, IEditController, IMidiMapping, ParamID, TChar};
 
 use crate::view::{ComponentHandlerCell, PluginView};
 
@@ -88,23 +88,32 @@ impl PluginEditor for HostNotifyingEditor {
 type EditorFactory = Box<dyn FnOnce(Arc<LockFreeParameterGateway>) -> Box<dyn PluginEditor>>;
 
 /// Real `IEditController` bridging a `gui_host::PluginEditor` factory
-/// closure into VST3's controller contract.
-#[VST3(implements(IEditController))]
+/// closure into VST3's controller contract. Also implements `IMidiMapping`
+/// so hosts can route a MIDI CC directly to a parameter's own automation
+/// lane -- VST3's idiomatic mechanism for MIDI-CC automation (there is no
+/// raw CC event in `IEventList`; see `crate::processor`'s note/pressure
+/// event handling for the MIDI this crate delivers as `handle_midi`
+/// instead). Confirmed against the real Steinberg validator.
+#[VST3(implements(IEditController, IMidiMapping))]
 pub struct VstEditController {
     parameters: RefCell<Vec<(ParameterInfo, f64)>>,
     make_editor: RefCell<Option<EditorFactory>>,
     gateway: Arc<LockFreeParameterGateway>,
     component_handler: ComponentHandlerCell,
+    midi_cc_map: &'static [(u8, ParameterId)],
 }
 
 impl VstEditController {
     /// `parameters` describes every automatable parameter; `make_editor` is
     /// called once (lazily, from `create_view`) to construct the plugin's
     /// `PluginEditor`, given the gateway it should use for UI-to-host
-    /// parameter forwarding.
+    /// parameter forwarding. `midi_cc_map` pairs a MIDI CC number with the
+    /// parameter it should automate (e.g. `(7, GAIN_PARAM)` for CC 7 ->
+    /// gain); an empty slice means this plugin has no MIDI-CC automation.
     pub fn new(
         parameters: Vec<ParameterInfo>,
         make_editor: impl FnOnce(Arc<LockFreeParameterGateway>) -> Box<dyn PluginEditor> + 'static,
+        midi_cc_map: &'static [(u8, ParameterId)],
     ) -> Box<Self> {
         let initial: Vec<(ParameterInfo, f64)> = parameters
             .into_iter()
@@ -119,14 +128,16 @@ impl VstEditController {
             RefCell::new(Some(Box::new(make_editor))),
             Arc::new(LockFreeParameterGateway::default()),
             Rc::new(RefCell::new(None)),
+            midi_cc_map,
         )
     }
 
     pub fn create_instance(
         parameters: Vec<ParameterInfo>,
         make_editor: impl FnOnce(Arc<LockFreeParameterGateway>) -> Box<dyn PluginEditor> + 'static,
+        midi_cc_map: &'static [(u8, ParameterId)],
     ) -> *mut c_void {
-        Box::into_raw(Self::new(parameters, make_editor)) as *mut c_void
+        Box::into_raw(Self::new(parameters, make_editor, midi_cc_map)) as *mut c_void
     }
 
     fn param_index(&self, id: u32) -> Option<usize> {
@@ -134,6 +145,39 @@ impl VstEditController {
             .borrow()
             .iter()
             .position(|(info, _)| info.id.0 == id)
+    }
+}
+
+impl IMidiMapping for VstEditController {
+    /// Ignores `bus_index`/`channel` (this crate's MIDI-CC automation is
+    /// global, not per-channel) and looks `midi_cc_number` up in
+    /// `midi_cc_map`, writing the matching parameter's ID and returning
+    /// `kResultTrue` -- from here, the host delivers that CC as ordinary
+    /// `IParameterChanges` automation, which `VstAudioProcessor::process`
+    /// already applies.
+    unsafe fn get_midi_controller_assignment(
+        &self,
+        _bus_index: i32,
+        _channel: i16,
+        midi_cc_number: CtrlNumber,
+        param_id: *mut ParamID,
+    ) -> tresult {
+        let Ok(cc) = u8::try_from(midi_cc_number) else {
+            return kResultFalse;
+        };
+        match self
+            .midi_cc_map
+            .iter()
+            .find(|(mapped_cc, _)| *mapped_cc == cc)
+        {
+            Some((_, mapped_param)) => {
+                unsafe {
+                    *param_id = mapped_param.0;
+                }
+                kResultTrue
+            }
+            None => kResultFalse,
+        }
     }
 }
 
