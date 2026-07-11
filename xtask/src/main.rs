@@ -7,6 +7,7 @@ mod bundle;
 mod new_plugin;
 mod plugin_target;
 mod setup;
+mod vst3;
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
@@ -19,7 +20,7 @@ fn main() -> ExitCode {
         "test" => run_test(),
         "check" => run_check(),
         "bundle-standalone" => bundle::bundle_standalone(),
-        "bundle-vst3" => bundle::bundle_vst3(),
+        "bundle-vst3" => vst3::bundle_vst3(),
         "bundle-au" => bundle::bundle_au(),
         "bundle-aax" => aax::bundle_aax(),
         "bundle-all" => run_bundle_all(),
@@ -38,7 +39,7 @@ fn main() -> ExitCode {
 fn run_bundle_all() -> ExitCode {
     let results = [
         ("standalone", bundle::bundle_standalone_status()),
-        ("vst3", bundle::bundle_vst3_status()),
+        ("vst3", vst3::bundle_vst3_status()),
         ("au", bundle::bundle_au_status()),
         ("aax", aax::bundle_aax_status()),
     ];

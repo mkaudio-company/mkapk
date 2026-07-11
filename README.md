@@ -2,7 +2,7 @@
 
 A cross-platform audio plugin build and packaging system for Rust: write **one processor (DSP) file and one UI file**, and build/bundle it as a Standalone app, VST3, AUv2, and AAX plugin on Windows and macOS.
 
-> **Status**: Active development — all core subsystems implemented and passing tests on macOS. Every plugin format (VST3, AUv2, AAX) has been validated against its real, official host-vendor validator (Steinberg's `validator`, Apple's `auval`, Avid's `AAXValidator.framework`), not just unit tests — see [Real validator testing](#real-validator-testing). Windows-specific runtime validation is pending a Windows CI runner.
+> **Status**: Active development — all core subsystems implemented and passing tests on macOS. AUv2 and AAX have been validated against their real, official host-vendor validators (Apple's `auval`, Avid's `AAXValidator.framework`), not just unit tests — see [Real validator testing](#real-validator-testing). VST3 was recently rewritten to a real C++ shim against Steinberg's own (now MIT-licensed) SDK, replacing a pure-Rust third-party binding; it hasn't been re-run against Steinberg's `validator` since that rewrite. Windows-specific runtime validation is pending a Windows CI runner.
 
 ## Overview
 
@@ -13,7 +13,7 @@ Formats are enabled per build via environment variable (no path set means that f
 | Format | Enabled by | Notes |
 |--------|-----------|-------|
 | Standalone | always | Real audio I/O (input + output device selection) via `cpal`; window via [`mkgraphic`](https://crates.io/crates/mkgraphic) on macOS |
-| VST3 | `VST3_SDK_PATH` set | `vst3-sys` is self-contained (no separate SDK download needed); the env var is purely an explicit opt-in gate |
+| VST3 | Vendored SDK submodules populated | Real, official (MIT-licensed) Steinberg VST3 SDK, vendored as git submodules at `crates/mkapk-vst3/thirdparty/` — run `git submodule update --init crates/mkapk-vst3/thirdparty/pluginterfaces crates/mkapk-vst3/thirdparty/base crates/mkapk-vst3/thirdparty/public.sdk` once; no separate download/env var needed |
 | AUv2 | macOS only | No SDK needed (AudioToolbox ships with the OS) |
 | AAX | `AAX_SDK_PATH` set | Real, loadable `.aaxplugin`: a generic C++ shim (`crates/mkapk-aax/cpp/`) built by the AAX SDK's own CMake tooling, bridging into the same `Processor` every other format uses — see [AAX architecture](#aax-architecture-generic-c-shim--rust-processor) |
 
@@ -25,7 +25,7 @@ Underneath the single project, this workspace also provides the platform-agnosti
 |---------|--------|-------|
 | Single project → 4 formats | Implemented | `plugins/gain`: one `Processor` + one `PluginEditor`, four real entry points |
 | Standalone host | Implemented | Real duplex audio I/O (`cpal`), input+output device picker on macOS |
-| VST3 entry point | Implemented & validated | Real `IPluginFactory`/`IComponent`/`IAudioProcessor`/`IEditController` via `vst3-sys`, gated by `VST3_SDK_PATH`; 47/47 on Steinberg's own `validator` |
+| VST3 entry point | Implemented | Real `IPluginFactory`/`IComponent`/`IAudioProcessor`/`IEditController`/`IPlugView` via a generic C++ shim (`crates/mkapk-vst3/cpp/`) against the vendored, MIT-licensed Steinberg VST3 SDK — see [VST3 architecture](#vst3-architecture-generic-c-shim--rust-processor); not yet re-run against Steinberg's own `validator` since this rewrite |
 | AUv2 entry point | Implemented & validated | Real `AudioComponentPlugInInterface` (hand-written dispatch over `au-sys` bindings) + `AUCocoaUIBase` custom UI, no SDK needed; passes Apple's `auval` |
 | AAX entry point | Implemented & validated | Real `AAX_CEffectParameters`/`AAX_CMain` via a generic C++ shim (gated by `AAX_SDK_PATH`); 6/6 on Avid's own `AAXValidator.framework` |
 | Real MIDI (automation + instruments) | Implemented & validated | `Processor::handle_midi` wired to real MIDI across all 4 formats -- see [MIDI support](#midi-support) |
@@ -58,7 +58,7 @@ Underneath the single project, this workspace also provides the platform-agnosti
 | `mkapk-win32` | Win32 windowing, Direct2D render backend, DirectWrite text, D3D11 GPU surface. |
 | `mkapk-mac` | AppKit/NSView windowing, CoreGraphics render backend (`drawRect:`-based `GuiPaintView`, with real mouse input), CoreText text, Metal GPU surface. |
 | `mkapk-standalone` | Standalone desktop host: real `cpal` audio I/O (input + output device selection, ring-buffer-bridged duplex capture/playback) and a real window, wired to any `Processor` + `PluginEditor` pair. |
-| `mkapk-vst3` | Real VST3 plugin entry point (`vst3_entry!` macro) gated by `VST3_SDK_PATH`, plus the `IPlugView` wrapper always available. |
+| `mkapk-vst3` | Real VST3 plugin entry point (`vst3_entry!` macro) via a generic C++ shim against the vendored Steinberg VST3 SDK (`crates/mkapk-vst3/{cpp,thirdparty}/`), gated by those submodules being populated; view-only stub otherwise. |
 | `mkapk-au` | Real AUv2 plugin entry point (`au_entry!` macro, hand-written `AudioComponentPlugInInterface` dispatch over `au-sys`) plus an `AUCocoaUIBase`-ready Cocoa UI. |
 | `mkapk-aax` | Real AAX plugin entry point: a generic, plugin-agnostic C++ shim (`cpp/`) built by the AAX SDK's own CMake tooling, bridged into any `mkapk_host::Processor` via the `aax_entry!` macro and a page-table generator (`page_table` module); gated by `AAX_SDK_PATH`. Build-only stub without the SDK. |
 | `mkapk-test-host` | DAW-less standalone test host for rapid iteration. |
@@ -68,7 +68,7 @@ Underneath the single project, this workspace also provides the platform-agnosti
 
 ```
 plugins/gain/
-  build.rs            # mirrors mkapk-vst3's/mkapk-aax's VST3_SDK_PATH/AAX_SDK_PATH gates at this crate's own compile time
+  build.rs            # mirrors mkapk-vst3's vendored-submodule check and mkapk-aax's AAX_SDK_PATH gate at this crate's own compile time
   src/
     processor.rs       # the one processor file — GainProcessor: mkapk_host::Processor
     ui.rs               # the one UI file — GainEditor: mkapk_host::PluginEditor
@@ -78,7 +78,7 @@ plugins/gain/
       aax_page_table.rs  # prints this plugin's AAX page-table XML, for xtask to capture at build time
 ```
 
-Cargo features: `standalone` (pulls in `mkapk-standalone`), `vst3` (pulls in `mkapk-vst3`; needs `VST3_SDK_PATH` at build time for a real entry point), `au` (pulls in `mkapk-au`; macOS only, real entry point unconditionally), `aax` (pulls in `mkapk-aax`; needs `AAX_SDK_PATH` at build time for a real entry point).
+Cargo features: `standalone` (pulls in `mkapk-standalone`), `vst3` (pulls in `mkapk-vst3`; needs its vendored SDK submodules populated for a real entry point — see the format table above), `au` (pulls in `mkapk-au`; macOS only, real entry point unconditionally), `aax` (pulls in `mkapk-aax`; needs `AAX_SDK_PATH` at build time for a real entry point).
 
 ## Creating a new plugin
 
@@ -130,8 +130,13 @@ cargo run -p mkapk-test-host --example blank -- --duration-ms 1000
 # Run the Gain plugin standalone (real audio I/O + real window)
 cargo run -p gain-plugin --bin gain-standalone --features standalone
 
-# Build the Gain plugin as a real VST3 plugin
-VST3_SDK_PATH=/path/to/anything cargo build -p gain-plugin --features vst3
+# Build the Gain plugin's VST3 Rust bridge (the real .vst3 bundle needs the
+# full `cargo xtask bundle-vst3` pipeline below, since VST3 now also
+# requires compiling a C++ shim — see VST3 architecture); needs
+# `git submodule update --init crates/mkapk-vst3/thirdparty/pluginterfaces
+# crates/mkapk-vst3/thirdparty/base crates/mkapk-vst3/thirdparty/public.sdk`
+# once, first
+cargo build -p gain-plugin --features vst3
 
 # Build the Gain plugin as a real Audio Unit (macOS)
 cargo build -p gain-plugin --features au
@@ -195,9 +200,18 @@ Each frame the widget tree rebuilds a `CommandList` of `PaintCommand`s. The comm
 
 The core is platform-agnostic. Platform crates translate `PaintCommand`s into Direct2D or CoreGraphics calls and native window events into `mkapk-core::Event`s. Unsafe code is isolated to the platform crates and gated with `#![deny(unsafe_code)]` in `mkapk-core`, `mkapk-host`, `mkapk-res`, `mkapk-accessibility`, `mkapk-widgets`, and `mkapk-standalone`.
 
+### VST3 architecture: generic C++ shim + Rust processor
+
+VST3 used to be implemented as a pure-Rust COM-vtable layer over `vst3-sys`/`vst3-com` — a third-party, GPL-3.0-licensed reimplementation of Steinberg's interfaces. Steinberg re-released the real VST3 SDK (3.8, October 2025) under MIT, so `mkapk-vst3` now vendors that SDK directly (`crates/mkapk-vst3/thirdparty/{pluginterfaces,base,public.sdk}`, pinned git submodules) and implements the plugin side with a generic C++ shim (`crates/mkapk-vst3/cpp/`) deriving from the SDK's own helper base classes (`Steinberg::Vst::AudioEffect`/`EditControllerEx1`), the same shape as AAX's shim below:
+
+- `VstProcessor`/`VstController`/`VstView` contain no plugin-specific identifiers or parameter names — they loop over `extern "C"` getters (`mkapk_vst3_parameter_count`/`_id`/`_name`/`_default`/`_step_count`, plus plugin-identity and bus-layout getters) that Rust provides, and forward real-time processing/state/editor calls to a persistent per-instance Rust `Processor`/`PluginEditor` handle (`mkapk_vst3_processor_*`/`mkapk_vst3_editor_*`).
+- All of those `extern "C"` functions are generated by one macro invocation: `mkapk_vst3::vst3_entry!` in `plugins/gain/src/lib.rs` — the same shape as `au_entry!`/`aax_entry!`. A new plugin needs zero new C++.
+- `crates/mkapk-vst3/cpp/CMakeLists.txt` compiles the shim plus the vendored SDK's required sources and links the Rust staticlib `cargo xtask bundle-vst3` builds, mirroring AAX's CMake step below — except it doesn't use the SDK's own bundle-assembly CMake helpers (not vendored, to avoid pulling in the large, unrelated VStGUI submodule), so `xtask` wraps the resulting shared library in the `.vst3` bundle shape itself (the same Info.plist/PkgInfo/codesign code AU's plain-cdylib build already used).
+- Without the submodules populated (`git submodule update --init crates/mkapk-vst3/thirdparty/pluginterfaces crates/mkapk-vst3/thirdparty/base crates/mkapk-vst3/thirdparty/public.sdk`), `mkapk-vst3` builds as a view-only stub, same spirit as AAX without `AAX_SDK_PATH`.
+
 ### AAX architecture: generic C++ shim + Rust processor
 
-Unlike VST3/AU, whose COM-vtable/C-ABI interfaces Rust implements directly, AAX's SDK is C++-only (`AAX_CEffectParameters` is an abstract C++ base class, not a plain C interface). That means AAX is the one format that genuinely needs a C++ layer — but that layer, in `crates/mkapk-aax/cpp/`, is **written once and reused for any plugin**, not hand-written per plugin:
+AAX's SDK is C++-only (`AAX_CEffectParameters` is an abstract C++ base class, not a plain C interface) and, unlike VST3's SDK, isn't vendored in this repo (Avid's AAX SDK requires its own separate license agreement — see `AAX_SDK_PATH` above). That layer, in `crates/mkapk-aax/cpp/`, is **written once and reused for any plugin**, not hand-written per plugin:
 
 - `AaxPlugin_Describe.cpp` / `AaxPlugin_Parameters.cpp` / `AaxPlugin_AlgProc.cpp` contain no plugin-specific identifiers or parameter names. At Describe/`EffectInit` time they loop over `extern "C"` getters (`mkapk_aax_parameter_count`/`_name`/`_default`/`_step_count`, plus plugin-identity getters) that Rust provides — up to a fixed capacity of 16 parameters (`mkapk_aax::component::MAX_PARAMS`, mirrored as `kAaxGeneric_MaxParams` in `cpp/mkapk_aax_bridge.h`).
 - All of those `extern "C"` functions, plus the real-time bridge `mkapk_aax_process_block`, are generated by one macro invocation: `mkapk_aax::aax_entry!` in `plugins/gain/src/lib.rs` — the same shape as `vst3_entry!`/`au_entry!`. A new plugin needs zero new C++.
@@ -215,18 +229,18 @@ The AAX SDK's own CMake tooling (`aax_plugin()` in `AAX_SDKFunctions.cmake`) com
 
 | Format | Mechanism |
 |--------|-----------|
-| VST3 | Notes/pressure via a real `kEvent` input bus + `IEventList` (`VstAudioProcessor::process`); CC automation via `IMidiMapping::get_midi_controller_assignment` on the controller (VST3's idiomatic mechanism — there's no raw CC event in `IEventList`), configured per plugin via `vst3_entry!`'s `midi_cc_map: &[(cc, ParameterId)]` field |
+| VST3 | Notes/pressure via a real `kEvent` input bus + `IEventList` (`VstProcessor::process`, in the C++ shim); CC automation via `IMidiMapping::getMidiControllerAssignment` on `VstController` (VST3's idiomatic mechanism — there's no raw CC event in `IEventList`), configured per plugin via `vst3_entry!`'s `midi_cc_map: &[(cc, ParameterId)]` field |
 | AUv2 | Real `MusicDeviceMIDIEvent` dispatch (selector `kMusicDeviceMIDIEventSelect`, hand-declared — not in `au-sys`) queued into a lock-free `MidiEventQueue` and drained at the start of `Render`. AU hosts only route MIDI to a Music Effect/Music Device component, never a plain Effect, so `xtask bundle-au` runs the plugin's own `<slug>-au-info` binary to learn its real component type (`aufx`/`aumf`/`aumu`) instead of assuming `aufx` |
 | AAX | Real `AAX_IMIDINode`/`AAX_CMidiStream` packet queue, registered via `AddMIDINode` only when a processor wants it (so a plain effect gets no "MIDI In" node at all) |
 | Standalone | Real MIDI input via [`midir`](https://crates.io/crates/midir) (same reasoning as `cpal` for audio: device/driver quirks are real risk to hand-roll blind), opening the first available port and feeding a lock-free queue the audio callback drains each block |
 
-Validated for real: VST3 stays 47/47 on Steinberg's `validator` (which confirms the `kEvent` bus and `IMidiMapping` assignment directly); AAX stays 6/6 on Avid's `AAXValidator.framework`; AU's real `auval` run includes a dedicated **"Test MIDI" step that only exercises `MusicDeviceMIDIEvent` at all once the component is registered as `aumf`** — confirmed by first seeing it silently skipped, then genuinely passing once `bundle-au`'s component-type resolution landed.
+Validated for real: AAX stays 6/6 on Avid's `AAXValidator.framework`; AU's real `auval` run includes a dedicated **"Test MIDI" step that only exercises `MusicDeviceMIDIEvent` at all once the component is registered as `aumf`** — confirmed by first seeing it silently skipped, then genuinely passing once `bundle-au`'s component-type resolution landed. VST3's `kEvent` bus/`IMidiMapping` wiring passed Steinberg's `validator` (47/47) under the previous `vst3-sys`-based implementation; not yet re-run against the new C++-shim implementation.
 
 ## Platform Support Matrix
 
 | Target | Build | Runtime Tests | Notes |
 |--------|-------|---------------|-------|
-| macOS (aarch64/x86_64) | PASS | PASS on host | CoreGraphics, CoreText, Metal GPU surface, real VST3/AU/AAX entry points, and real duplex audio all validated on real hardware |
+| macOS (aarch64/x86_64) | PASS | PASS on host | CoreGraphics, CoreText, Metal GPU surface, real AU/AAX entry points, and real duplex audio all validated on real hardware; VST3's new C++-shim entry point builds and links but hasn't been re-validated against a real host since the rewrite |
 | Windows (x86_64) | PASS via cross-check | SKIP on this host | Direct2D/DirectWrite/D3D11 code and the Win32 mouse-input path compile; runtime needs Windows CI |
 | Linux | Not supported | N/A | Out of scope |
 
@@ -236,7 +250,7 @@ Every plugin format has been checked against its real, official host-vendor vali
 
 | Format | Validator | Result |
 |--------|-----------|--------|
-| VST3 | Steinberg's own `validator` (built from `vst3sdk` source) | 47/47 tests pass |
+| VST3 | Steinberg's own `validator` (built from `vst3sdk` source) | 47/47 tests pass under the previous `vst3-sys`-based implementation; not yet re-run since the C++-shim rewrite |
 | AUv2 | Apple's `auval` | Passes (session-state persistence — `ClassInfo`/`PresentPreset` — is deliberately out of scope) |
 | AAX | Avid's `AAXValidator.framework` C API (`test.data_model`, `.load_unload`, `.parameters`, `.parameter_traversal.linear`, `.page_table.load`, `.describe_validation`) | 6/6 tests pass |
 
@@ -273,7 +287,7 @@ The GitHub Actions workflow (`.github/workflows/ci.yml`) runs on `windows-latest
 - `cargo clippy --workspace -- -D warnings`
 - `cargo fmt --check`
 
-VST3 builds are gated by the `vst3` feature and `VST3_SDK_PATH`; AAX builds are gated by the `aax` feature and `AAX_SDK_PATH`; AU needs neither (macOS only).
+VST3 builds are gated by the `vst3` feature and its vendored SDK submodules being populated; AAX builds are gated by the `aax` feature and `AAX_SDK_PATH`; AU needs neither (macOS only).
 
 ## License
 
@@ -290,7 +304,7 @@ Every `crates/gui-*` library crate carries real `description`/`categories`/`keyw
 
 - `resvg` / `usvg` / `tiny-skia` for SVG rasterization
 - `image` for PNG decoding
-- `vst3-sys` for VST3 bindings
+- Steinberg's VST3 SDK (MIT-licensed) for VST3 bindings
 - `au-sys` for AUv2 bindings
 - `cpal` for cross-platform audio I/O
 - `mkgraphic` for the standalone app's native window

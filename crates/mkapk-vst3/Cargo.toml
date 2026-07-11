@@ -14,9 +14,7 @@ keywords.workspace = true
 [dependencies]
 mkapk-core = { workspace = true }
 mkapk-host = { workspace = true }
-vst3-sys = { git = "https://github.com/RustAudio/vst3-sys", optional = true }
-vst3-com = { git = "https://github.com/RustAudio/vst3-sys", optional = true }
 
 [features]
 default = ["vst3"]
-vst3 = ["dep:vst3-sys", "dep:vst3-com"]
+vst3 = []

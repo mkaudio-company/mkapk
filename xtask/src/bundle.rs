@@ -64,60 +64,55 @@ impl BundleStatus {
     }
 }
 
-/// Additional `Info.plist` dict entries a format needs (e.g. AU's
-/// `AudioComponents` array), inserted verbatim just before `</dict>`.
-/// Boxed (rather than a bare `fn` pointer) since AU's needs to capture the
-/// component type [`resolve_au_component_type`] resolves.
-type InfoPlistExtra = Box<dyn Fn(&PluginTarget, &str, &str) -> String>;
-
-struct CdylibPluginSpec {
-    /// The plugin crate's cargo feature that gates this format's real entry
-    /// point in (`vst3` or `au`).
-    feature: &'static str,
-    bundle_extension: &'static str,
-    package_type: &'static str,
-    /// Name of the exported C symbol that only exists when the format's
-    /// real entry point actually compiled in (e.g. `GetPluginFactory`,
-    /// `<slug>_au_factory`); used to check honestly whether this bundle is
-    /// really loadable, rather than assuming it from the feature flag
-    /// alone.
-    entry_symbol: String,
-    format_name: &'static str,
-    info_plist_extra: InfoPlistExtra,
-}
-
-pub fn bundle_vst3() -> ExitCode {
-    bundle_vst3_status().into_exit_code()
-}
-
-pub fn bundle_vst3_status() -> BundleStatus {
-    bundle_cdylib_plugin(CdylibPluginSpec {
-        feature: "vst3",
-        bundle_extension: "vst3",
-        package_type: "BNDL",
-        entry_symbol: "GetPluginFactory".to_string(),
-        format_name: "VST3",
-        info_plist_extra: Box::new(|_, _, _| String::new()),
-    })
-}
-
 pub fn bundle_au() -> ExitCode {
     bundle_au_status().into_exit_code()
 }
 
 pub fn bundle_au_status() -> BundleStatus {
+    if !cfg!(target_os = "macos") {
+        return BundleStatus::Skip(
+            ".component is a macOS bundle format; skipping on this platform.".to_string(),
+        );
+    }
+
     let target = PluginTarget::resolve();
+
+    println!(
+        "Running: cargo build -p {} --features au",
+        target.package_name
+    );
+    let status = Command::new("cargo")
+        .args(["build", "-p", &target.package_name, "--features", "au"])
+        .status()
+        .expect("failed to run cargo build");
+    if !status.success() {
+        return BundleStatus::Fail(format!(
+            "cargo build -p {} --features au did not succeed",
+            target.package_name
+        ));
+    }
+
+    let cdylib_path = workspace_root().join(format!("target/debug/lib{}.dylib", target.lib_name));
+    if !cdylib_path.exists() {
+        return BundleStatus::Fail(format!(
+            "expected built cdylib at {}",
+            cdylib_path.display()
+        ));
+    }
+
     let component_type = resolve_au_component_type(&target);
-    bundle_cdylib_plugin(CdylibPluginSpec {
-        feature: "au",
-        bundle_extension: "component",
-        package_type: "BNDL",
-        entry_symbol: target.au_factory_symbol.clone(),
-        format_name: "Audio Unit",
-        info_plist_extra: Box::new(move |target, plugin_name, company_name| {
-            au_components_plist(target, plugin_name, company_name, &component_type)
-        }),
-    })
+    let plugin_name = resolve_plugin_name(&crate::new_plugin::titlecase(&target.slug));
+    let company_name = resolve_company_name();
+    let extra = au_components_plist(&target, &plugin_name, &company_name, &component_type);
+
+    assemble_cdylib_bundle(
+        &cdylib_path,
+        &plugin_name,
+        "component",
+        &target.au_factory_symbol,
+        "Audio Unit",
+        &extra,
+    )
 }
 
 /// Runs the plugin's own `<slug>-au-info` binary (see
@@ -205,60 +200,34 @@ fn au_components_plist(
     )
 }
 
-fn bundle_cdylib_plugin(spec: CdylibPluginSpec) -> BundleStatus {
-    if !cfg!(target_os = "macos") {
-        return BundleStatus::Skip(format!(
-            ".{} is a macOS bundle format; skipping on this platform.",
-            spec.bundle_extension
-        ));
-    }
+/// Wraps an already-built shared library (`built_binary_path`) in the
+/// standard macOS bundle shape (`Contents/MacOS/<plugin_name>` +
+/// `Info.plist` + `PkgInfo`, code-signed if possible) and reports whether
+/// `entry_symbol` is really exported -- shared by AU (whose `cargo build`
+/// directly produces the final cdylib) and VST3 (whose CMake step produces
+/// the final shared library from a Rust staticlib plus the C++ shim; see
+/// `vst3.rs`).
+pub fn assemble_cdylib_bundle(
+    built_binary_path: &Path,
+    plugin_name: &str,
+    bundle_extension: &str,
+    entry_symbol: &str,
+    format_name: &str,
+    info_plist_extra: &str,
+) -> BundleStatus {
+    let entry_point_present = dylib_exports_symbol(built_binary_path, entry_symbol);
 
-    let target = PluginTarget::resolve();
-
-    println!(
-        "Running: cargo build -p {} --features {}",
-        target.package_name, spec.feature
-    );
-    let status = Command::new("cargo")
-        .args([
-            "build",
-            "-p",
-            &target.package_name,
-            "--features",
-            spec.feature,
-        ])
-        .status()
-        .expect("failed to run cargo build");
-    if !status.success() {
-        return BundleStatus::Fail(format!(
-            "cargo build -p {} --features {} did not succeed",
-            target.package_name, spec.feature
-        ));
-    }
-
-    let workspace_root = workspace_root();
-    let cdylib_path = workspace_root.join(format!("target/debug/lib{}.dylib", target.lib_name));
-    if !cdylib_path.exists() {
-        return BundleStatus::Fail(format!(
-            "expected built cdylib at {}",
-            cdylib_path.display()
-        ));
-    }
-
-    let entry_point_present = dylib_exports_symbol(&cdylib_path, &spec.entry_symbol);
-
-    let plugin_name = resolve_plugin_name(&crate::new_plugin::titlecase(&target.slug));
     let company_name = resolve_company_name();
     let bundle_id = format!(
         "com.{}.{}.{}",
         slugify(&company_name),
-        slugify(&plugin_name),
-        spec.bundle_extension
+        slugify(plugin_name),
+        bundle_extension
     );
 
-    let out_dir = workspace_root.join("target/bundles");
+    let out_dir = workspace_root().join("target/bundles");
     fs::create_dir_all(&out_dir).expect("failed to create target/bundles");
-    let bundle_path = out_dir.join(format!("{plugin_name}.{}", spec.bundle_extension));
+    let bundle_path = out_dir.join(format!("{plugin_name}.{bundle_extension}"));
     if bundle_path.exists() {
         fs::remove_dir_all(&bundle_path).expect("failed to remove stale bundle");
     }
@@ -267,26 +236,20 @@ fn bundle_cdylib_plugin(spec: CdylibPluginSpec) -> BundleStatus {
     let macos_dir = contents.join("MacOS");
     fs::create_dir_all(&macos_dir).expect("failed to create bundle Contents/MacOS");
 
-    let exe_name = &plugin_name;
-    fs::copy(&cdylib_path, macos_dir.join(exe_name)).expect("failed to copy plugin cdylib");
+    fs::copy(built_binary_path, macos_dir.join(plugin_name)).expect("failed to copy plugin binary");
 
-    let extra = (spec.info_plist_extra)(&target, &plugin_name, &company_name);
     fs::write(
         contents.join("Info.plist"),
         info_plist(
-            exe_name,
-            &plugin_name,
+            plugin_name,
+            plugin_name,
             &bundle_id,
-            spec.package_type,
-            &extra,
+            "BNDL",
+            info_plist_extra,
         ),
     )
     .expect("failed to write Info.plist");
-    fs::write(
-        contents.join("PkgInfo"),
-        format!("{}????", spec.package_type),
-    )
-    .expect("failed to write PkgInfo");
+    fs::write(contents.join("PkgInfo"), "BNDL????").expect("failed to write PkgInfo");
 
     println!("Assembled bundle: {}", bundle_path.display());
 
@@ -296,18 +259,15 @@ fn bundle_cdylib_plugin(spec: CdylibPluginSpec) -> BundleStatus {
 
     if entry_point_present {
         BundleStatus::Pass(format!(
-            "{} bundle assembled with a real `{}` entry point at {}",
-            spec.format_name,
-            spec.entry_symbol,
+            "{format_name} bundle assembled with a real `{entry_symbol}` entry point at {}",
             bundle_path.display()
         ))
     } else {
         BundleStatus::Skip(format!(
-            "{} bundle assembled at {}, but its build didn't export `{}` (its SDK/feature gate \
-             wasn't set), so this is packaging/signing plumbing only, not yet DAW-scannable.",
-            spec.format_name,
-            bundle_path.display(),
-            spec.entry_symbol
+            "{format_name} bundle assembled at {}, but its build didn't export `{entry_symbol}` \
+             (its SDK/feature gate wasn't set), so this is packaging/signing plumbing only, not \
+             yet DAW-scannable.",
+            bundle_path.display()
         ))
     }
 }
