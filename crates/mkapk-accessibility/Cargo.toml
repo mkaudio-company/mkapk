@@ -18,10 +18,3 @@ mkapk-core = { workspace = true }
 [features]
 default = []
 backend = []
-
-[target.'cfg(target_os = "macos")'.dev-dependencies]
-mkapk-test-host = { workspace = true }
-mkapk-mac = { workspace = true }
-
-[target.'cfg(target_os = "windows")'.dev-dependencies]
-mkapk-win32 = { workspace = true }

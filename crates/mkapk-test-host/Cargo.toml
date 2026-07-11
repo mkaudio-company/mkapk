@@ -27,9 +27,6 @@ mkapk-mac = { workspace = true }
 mkapk-win32 = { workspace = true }
 mkapk-widgets = { workspace = true }
 
-[dev-dependencies]
-mkapk-accessibility = { workspace = true }
-
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62.2", default-features = false, features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_Graphics_Gdi"] }
 

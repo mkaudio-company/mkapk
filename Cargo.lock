@@ -1059,9 +1059,6 @@ name = "mkapk-accessibility"
 version = "0.1.1"
 dependencies = [
  "mkapk-core",
- "mkapk-mac",
- "mkapk-test-host",
- "mkapk-win32",
 ]
 
 [[package]]
@@ -1141,7 +1138,6 @@ version = "0.1.1"
 dependencies = [
  "cocoa",
  "core-graphics 0.24.0",
- "mkapk-accessibility",
  "mkapk-core",
  "mkapk-host",
  "mkapk-mac",
