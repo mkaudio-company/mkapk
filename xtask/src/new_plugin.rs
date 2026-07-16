@@ -321,11 +321,18 @@ fn generate(
     fs::create_dir_all(plugin_dir.join("src/bin"))
         .map_err(|e| format!("failed to create {}: {e}", plugin_dir.display()))?;
 
-    copy_and_substitute(
-        &template_dir.join("build.rs"),
-        &plugin_dir.join("build.rs"),
-        identity,
-    )?;
+    // Only needed to emit the `vst3_sdk`/`aax_sdk` cfgs those two formats'
+    // entry-point macros gate on (see `plugins/gain/build.rs`'s own doc
+    // comment) -- a plugin scaffolded without either format has nothing
+    // for a build script to detect, so skip generating one at all rather
+    // than shipping dead SDK-path-probing code with every new project.
+    if has("vst3") || has("aax") {
+        copy_and_substitute(
+            &template_dir.join("build.rs"),
+            &plugin_dir.join("build.rs"),
+            identity,
+        )?;
+    }
     copy_and_substitute(
         &template_dir.join("src/processor.rs"),
         &plugin_dir.join("src/processor.rs"),
