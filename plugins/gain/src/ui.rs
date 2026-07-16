@@ -7,11 +7,11 @@ use std::sync::Arc;
 use mkapk_core::{
     CommandList, Event, EventDispatcher, EventResponse, Insetsf, LayoutConstraints,
     LayoutDirection, LayoutEngine, LayoutNode, LayoutResult, MouseEvent, PaintCommand,
-    PointerEvent, Rectf, Sizef, Tree, TraverseOrder, Widget, WidgetId, downcast_widget_ref,
+    PointerEvent, Rectf, Sizef, TraverseOrder, Tree, Widget, WidgetId, downcast_widget_ref,
 };
 use mkapk_host::{
-    EditorHost, LockFreeParameterGateway, NormalizedValue, ParameterId,
-    ParentWindowHandle, PeakMeter, PluginEditor, SizeConstraints,
+    EditorHost, LockFreeParameterGateway, NormalizedValue, ParameterId, ParentWindowHandle,
+    PeakMeter, PluginEditor, SizeConstraints,
 };
 use mkapk_widgets::Theme;
 
@@ -28,16 +28,29 @@ struct Panel {
 
 impl Panel {
     fn new(theme: Theme) -> Self {
-        Self { id: WidgetId::new(), theme, frame: Cell::new(Rectf::default()) }
+        Self {
+            id: WidgetId::new(),
+            theme,
+            frame: Cell::new(Rectf::default()),
+        }
     }
-    fn set_frame(&self, frame: Rectf) { self.frame.set(frame); }
+    fn set_frame(&self, frame: Rectf) {
+        self.frame.set(frame);
+    }
 }
 
 impl Widget for Panel {
-    fn id(&self) -> WidgetId { self.id }
-    fn layout(&self, _constraints: LayoutConstraints) -> Sizef { Sizef::zero() }
+    fn id(&self) -> WidgetId {
+        self.id
+    }
+    fn layout(&self, _constraints: LayoutConstraints) -> Sizef {
+        Sizef::zero()
+    }
     fn paint(&self, commands: &mut CommandList) {
-        commands.push(PaintCommand::FillRect { rect: self.frame.get(), color: self.theme.background });
+        commands.push(PaintCommand::FillRect {
+            rect: self.frame.get(),
+            color: self.theme.background,
+        });
     }
 }
 
@@ -84,7 +97,11 @@ impl GainEditor {
         });
         let margin = Insetsf::uniform(4.0);
         for &id in &[] {
-            layout_engine.set_node(LayoutNode { id, margin, ..LayoutNode::default() });
+            layout_engine.set_node(LayoutNode {
+                id,
+                margin,
+                ..LayoutNode::default()
+            });
         }
 
         let size = Sizef::new(760.0, 600.0);
@@ -122,14 +139,17 @@ impl GainEditor {
 
     fn apply_layout(&mut self) {
         for (&id, layout_box) in self.layout.iter() {
-            let Some(node) = self.tree.find(id) else { continue };
+            let Some(node) = self.tree.find(id) else {
+                continue;
+            };
             let widget = node.widget.borrow();
             let frame = Rectf::new(layout_box.origin, layout_box.size);
-            if let Some(panel) = downcast_widget_ref::<Panel>(&**widget) { panel.set_frame(frame); }
+            if let Some(panel) = downcast_widget_ref::<Panel>(&**widget) {
+                panel.set_frame(frame);
+            }
         }
         self.tree.set_layout_result(self.layout.clone());
     }
-
 }
 
 impl PluginEditor for GainEditor {
